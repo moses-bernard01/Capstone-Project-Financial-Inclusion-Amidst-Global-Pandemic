@@ -1,0 +1,2865 @@
+---
+title: "DATA309 Global Findex Database (GFD)"
+format: html
+editor: visual
+author: Moses Bernard Velano and Grace Cleland-Pottie
+date: 2023-08-24
+---
+
+## Introduction
+
+The dataset here is from the Global Findex Database (GFD).
+
+The GFD is produced by the World Bank which contains a complete dataset that provides important information on financial inclusion and the usage of financial services provided worldwide. The database is based on a series of nationally representative survey conducted in partnership with several countries and economies. "Findex" is short for Financial Inclusion Index.
+
+The main purpose of the GFD is to measure the range of financial inclusion and evaluate the use of formal financial services, such as bank accounts, credit, insurance, and mobile money accounts, among individuals aged 15 years and above. By collecting data on financial behaviors, account ownership, and usage patterns, the database offers insights into how people access and interact with the formal financial system.
+
+The GFD is a way to assess the progress of financial inclusion worldwide and it identifies any gaps and opportunities to improve the expansion of access to a formal financial services. Policymakers, researches, financial institutions, and other stakeholders use this data to design and implement strategies that promote financial inclusion and improve overall economic well-being of under-served populations.
+
+## Running Collected Data
+
+```{r loading_data}
+### Loading packages that may be needed later.
+library(readxl) # provides functions to read data in excel files
+library(ggplot2) # allows to create a variety of complex and customizable plots, graphs, and visualizations.
+library(tidyverse) # provides a consistent set of tools for data manipulation, visualization, and analysis.
+library(readr) # allows reading and parsing data into R
+library(stringr) # offers functions for manipulating and working with character strings
+library(visdat) # helps visualize missing values in a dataset
+library(skimr) # offers a compact summary of your dataset's properties, including summary statistics and data types.
+library(highcharter) # enables to create interactive and customizable charts, graphs, and visualizations directly in R.
+library(dplyr) # for data manipulation tasks
+library(plotly) # tool for creating interactive visualizations
+
+###------- Downloading the Global Findex Database into R and veiwing the whole dataset
+DatabankWide <- read_excel("DatabankWide.xlsx")
+#View(DatabankWide) ### view the contents of the data set 
+
+class(DatabankWide) # to determine the data type or class 
+str(DatabankWide) # display the structure
+str(DatabankWide, max.level = 1) # display the structure of the data while limiting output
+
+
+### Visualization of any missing values in our data set
+#vis_miss(DatabankWide)
+#vis_dat(DatabankWide)
+
+```
+
+As we can see, from visualizing the data set "DatabankWide" there area vast number of missing value (NAs) that are present in the data set. The structure of the data seems to be accurate and informative (seen under the use of str() function). All numeric variables are labelled as numeric (num) and character variables labelled as characters (chr).
+
+### Data Processing
+
+As per the research conducted by Watkins et al. (2023), two indicators were developed from the pool of 20 variables. These indicators aid in gauging the level to which the population of each nation is involved in utilizing multiple financial services and activities.
+
+In order for the literature to preserve the essential information from the 20 variables during data processing, they have utilized a statistical procedure of Principal Component Analysis (PCA). PCA evaluates the process of dimension reduction where it transforms a high-dimensional dataset into a lower-dimension space while trying to preserve the original variance that comes with it.
+
+The analysis they obtained indicates that the first two principal components (Comp1 and Comp2) clearly account for approximately 72% of the total explained variance among the 20 variables. This led them to create two indicators. The first indicator, Principal Component (Comp1) represents 'broad access to and use of formal financial tools' (Watkins et al., 2023), such as savings, loans, cards, and other services provided by financial institutions, as well as internet usage. On the other hand, the second indicator, Principal Component (Comp2) depicts 'reliance on alternative, informal, and distress financial tools,' signifying informal financial activities such as mobile transactions, borrowing from family and friends, selling assets for emergency situations, and borrowing for urgent medical needs (Watkins et al., 2023)."
+
+Hence in our scenario, due to having insufficient data wherein two of the 12 variables from the first PC (Comp1) do not have data looking at females or adults with the poorest income. Our solution was to replace these missing variables with two variables from the second PC (Comp2) column (keeping in mind only those that explain majority of the variance found in the data). 
+
+We also believe it is important to do this because the first PC (Comp1) represents 'Broad access to and use of formal financial tools' which, when looking at populations of women and poor adults, may not represent them best. We are assuming scenarios where women are not allowed to have access to financial formal tools and therefore rely on informal financial tools such as borrowing from family and friends. These situations could also vary due to the impact of COVID-19. Consequently, we incorporated some significant variables from the second PC (Comp2) that have the most variance explained along that column. In this way, we are allowing a broader representation of the financial inclusion index among the general population, women, and low-income adults.
+
+The chunk of code below focuses on processing the data files, some conditions (shown and explained in the code chunk) are applied to satisfy our desired goals. Extracting only the variables that were significantly correlated with the first and second principal component (Comp1 & Comp2), which incorporates formalized financial tools, including both traditional tools, internet usage, and informal financial tools (Watkins et al., 2023).
+
+```{r data_process_comp1}
+###--------------------------- Removing year 2011 and 2014
+DatabankWide <- DatabankWide %>% filter(Year != "2011") %>%  # Removing unwanted observations
+  filter(Year != "2014") %>%
+  filter(Year != "2022")
+
+### To view the first 6 results
+#head(DatabankWide) ### unwanted years removed from the data set.
+
+###--- Uncomment the section below to view the dataframe
+#View(DatabankWide) ### Resulting Dataframe
+
+###------------ Extracting certain variables needed for the first Principal Component
+comp1_df <- DatabankWide |>
+  select("Country name","Country code", "Year", "Adult populaiton", "Income group", 
+         "Financial institution account (% age 15+)",
+         "Borrowed from a formal financial institution (% age 15+)", 
+         "Saved at a financial institution (% age 15+)", 
+         "Owns a debit card (% age 15+)", 
+         "Owns a credit card (% age 15+)",
+         "Has an outstanding housing loan (% age 15+)",
+         "Used a mobile phone or the internet to buy something online (% age 15+)",
+         "Made or received a digital payment (% age 15+)",
+         "Saved for old age (% age 15+)",
+         "Borrowed for health or medical purposes (% age 15+)",
+         "Borrowed from family or friends (% age 15+)",
+         "Coming up with emergency funds in 7 days: possible (% age 15+)"
+         )
+
+#head(comp1_df) ### to view first 6 output
+#View(comp1_df) ### view resulting data frame
+
+
+###------------------- Renaming Column to make it more approriate
+## Changing variables name in the Financial Inclusion (FI) into a more sensible name by using "rename()" function.
+## All variable names have to start with small letters, and cannot have a blank in them.
+   
+new_comp1_df <- comp1_df |>
+  rename(country = "Country name") |>
+  rename(country_code = "Country code") |>
+  rename(year = "Year") |>
+  rename(adult_population = "Adult populaiton") |>
+  rename(income_group = "Income group") |>
+  rename(financial_account = "Financial institution account (% age 15+)") |>
+  rename(formal_financial_borrowing_rate = "Borrowed from a formal financial institution (% age 15+)") |>
+  rename(saved_at_a_financial_insitution = "Saved at a financial institution (% age 15+)") |>
+  rename(debit_card_ownership = "Owns a debit card (% age 15+)") |>
+  rename(credit_card_ownership = "Owns a credit card (% age 15+)") |>
+  rename(outstanding_housing_loan = "Has an outstanding housing loan (% age 15+)") |>
+  rename(used_internet_for_online_transaction = "Used a mobile phone or the internet to buy something online (% age 15+)") |>
+  rename(made_or_recieve_digital_payment = "Made or received a digital payment (% age 15+)") |>
+  rename(saved_for_old_age = "Saved for old age (% age 15+)") |>
+  rename(borrowed_for_medical_needs = "Borrowed for health or medical purposes (% age 15+)") |>
+  rename(borrowed_from_family_or_friends = "Borrowed from family or friends (% age 15+)") |>
+  rename(creating_possible_emergency_funds = "Coming up with emergency funds in 7 days: possible (% age 15+)")
+
+#head(new_comp1_df) ### to view first 6 output
+#view(new_comp1_df) ### view resulting data frame
+
+```
+
+### Replication
+
+The process done below is for replicating the work done by Watkins et al., (2023). We have created a new variable data set using the same information form their findings on the "Principal components' correlation with the original Global Findex variables". We plan to use that information and use it as weights for calculation of a variable within the same data set.
+
+The new variable dataset contains only the first and second Principal Component (PC) along with the variables that were considered to have a large magnitude of loading values. The general assumption is that, the first few PC often captures the majority of the variation in the dataset and these are valuable for further interpretation. The loadings examines the representation of the correlations between each observed variables and each PCs.
+
+A positive loading indicates a positive relationship, where higher values of the original variable correspond to higher values of the principal component, and vice versa. On the other hand, a negative loading indicates an inverse relationship, where higher values of the original variable correspond to lower values of the principal component, and vice versa.
+
+The process of PCA came from covariance matrix calculation of the standardized data. The covariance matrix portrays how different features (variables) differ together. The variance of individual features are seen in the diagonal elements of the covariance matrix. Conversely, the off-diagonal represents the covariance between pairs of features. Calculating eigenvectors and eigenvalues of the covariance matrix are done, where eigenvectors show the direction (principal component) in the original feature along which the data varies the most. The eigenvalues evaluates the amount of variance explained in each PC (Jaadi, Z., 2023).
+
+### General Population Data Processing
+
+The code block below are the process of data manipulation/transformation for the chosen variable creating a financial inclusion index that is representative of the general population, women and low-income adults. Chosen variables are derived from both first and second PC (Comp1 and Comp2) data frame made previously.
+
+```{r calculate_pc_general}
+
+#-------------------------- Dataframe tranformation on the First Principal Component
+summary(new_comp1_df) ### summarised 
+#view(new_comp1_df) ### shows first 6 reuslts
+
+
+#--- We replaced all NAs in the selected variables with 0
+#--- And we saved them with new names using mutate()
+comp1_df2 = new_comp1_df |>
+  mutate(finacc = replace_na(financial_account, 0),
+         borrowing = replace_na(formal_financial_borrowing_rate, 0),
+         savings = replace_na(saved_at_a_financial_insitution, 0),
+         debit_card = replace_na(debit_card_ownership, 0),
+         credit_card = replace_na(credit_card_ownership, 0),
+         housing_loan = replace_na(outstanding_housing_loan, 0),
+         internet = replace_na(used_internet_for_online_transaction, 0),
+         digitalpayment = replace_na(made_or_recieve_digital_payment, 0),
+         oldagesave = replace_na(saved_for_old_age, 0),
+         medical_needs = replace_na(borrowed_for_medical_needs, 0),
+         borrowed_familyfriends = replace_na(borrowed_from_family_or_friends, 0),
+         emergency_fund = replace_na(creating_possible_emergency_funds, 0)
+         )
+
+#head(comp1_df2) ### to view first 6 output
+#view(comp1_df2) ### view resulting data frame
+
+#--- then we created a single VARIBALE termed fin_inclusion_index
+#--- capturing all the weights from the global health article
+#--- out of all variables and their listed weights
+#--- in Table 4 for the first component
+#--- hence the name comp1
+
+#--- Creating a single variable termed 'fin_inclusion_index'
+#--- capturing all weights from Global Public Health article
+#--- retrieved from first and second Principal Component
+comp1_df3 = comp1_df2 |>
+  mutate(fin_inclusion_index = finacc * 0.259 +
+           borrowing * 0.261 +
+           savings * 0.268 +
+           debit_card * 0.264 +
+           credit_card * 0.263 +
+           housing_loan * 0.248 +
+           internet * 0.272 +
+           digitalpayment * 0.264 +
+           oldagesave * 0.255 +
+           medical_needs * 0.312 +
+           borrowed_familyfriends * 0.368 +
+           emergency_fund * -0.234
+         )
+
+names(comp1_df3) ### variable names
+#view(comp1_df3) ### view resulting data frame
+
+
+#------- Creating another data set with ONLY country, year, and financial inclusion index
+# using select() function
+princompdf2 = comp1_df3 |>
+  select(country, year, fin_inclusion_index)
+
+summary(princompdf2) # we summarised all the variabless
+
+length(princompdf2$fin_inclusion_index) # we found out how many rows of data
+#head(princompdf2) ### to view first 6 output
+#view(princompdf2) ### view resulting data frame
+
+#--- Then we made a histogram to chart the worldwide financial inclusion index
+ggplot(princompdf2, aes(fin_inclusion_index)) +
+  geom_histogram() +
+  theme_classic()
+
+#--- we calculated financial inclusion by year for all countries
+finincl_by_year = princompdf2 |>
+  group_by(year) |>
+  summarise(mean_fin_in = mean(fin_inclusion_index))
+
+finincl_by_year
+#view(finincl_by_year) # To see the new dataframe
+
+#--- we calculated MEAN or AVERAGE financial inclusion by country by year
+finincl_by_year_country = princompdf2 |>
+  group_by(country, year) |>
+  summarise(mean_fin_in = mean(fin_inclusion_index))
+
+finincl_by_year_country
+#view(finincl_by_year_country) ### view resulting data frame
+
+#--- this above data set was in long format, so we converted that to a wide format so that we could have data on years in two columns, hence the name 
+two_columns = finincl_by_year_country |>
+  pivot_wider(names_from = year,
+              values_from = mean_fin_in)
+
+#view(two_columns) ### view resulting data frame
+
+#--- We have renamed 2017 to precovid, and so on
+pre_during_covid = two_columns |>
+  rename(pre_covid_index = `2017`,
+         during_covid_index = `2021`) |>
+  select(country, pre_covid_index, during_covid_index)
+
+#head(pre_during_covid) ### to see the first 6 results
+
+#--- which countries had lowered indexes during covid compared with pre-covid?
+low_index_countries = pre_during_covid |>
+  mutate(index_dropped = (during_covid_index < pre_covid_index))
+
+#head(low_index_countries) ### to see the first 6 results
+#view(low_index_countries) ### view resulting data frame
+
+#--- filter out NAs
+low_index_filtered = drop_na(low_index_countries) # dropping NA values
+head(low_index_filtered) # see the first 6 results
+#view(low_index_filtered) # ensuring no NA values appear
+
+index_dropped_count = low_index_filtered |>
+  group_by(index_dropped) |>
+  summarise(n = n())
+
+index_dropped_count # no. of countries for whom dropped their scores, or became worse
+#view(index_dropped_count) ### view resulting data frame
+
+#-- for which countries had index dropped?
+countries_for_whom_dropped = low_index_filtered |>
+  filter(index_dropped == TRUE) |>
+  select(country)
+
+knitr::kable(countries_for_whom_dropped) # to view which countries had index dropped
+#view(countries_for_whom_dropped) ### view resulting data frame
+
+#--- for which countries had index increased
+countries_for_whom_increased = low_index_filtered |>
+  filter(index_dropped == FALSE) |>
+  select(country)
+
+#view(countries_for_whom_increased) ### view resulting data frame
+
+```
+
+### Women FI Data Processing
+
+The following chunk of code has the purpose of building a financial inclusion index to measure financial inclusion among the female population of data found in the GFD. The code begins by creating a new data frame consisting of the 12 variables, as previously extracted above, which has taken influenced from the first and second principle components that best explain the variance in the data within the Watkins et al., (2023) paper.
+
+```{r calculating_pc_women}
+
+###------------------- Extracting appropriate variables from DatabankWide dataset
+#--- Variable data frame for women's financial inclusion index numbers
+womens_fi <- DatabankWide |> select('Country name',
+                                    'Country code',
+                                    'Year',
+                                    'Adult populaiton',
+                                    'Income group',
+                                    'Financial institution account, female (% age 15+)',
+                                    'Borrowed from a formal financial institution, female (% age 15+)',
+                                    'Owns a credit card, female (% age 15+)',
+                                    'Owns a debit card, female (% age 15+)',
+                                    'Saved at a financial institution, female (% age 15+)',
+                                    'Has an outstanding housing loan, female (% age 15+)',
+                                    'Made or received a digital payment, female (% age 15+)',
+                                    'Saved for old age, female (% age 15+)',
+                                    'Used a mobile phone or the internet to buy something online, female (% age 15+)', 
+                                    'Borrowed from family or friends, female (% age 15+)',
+                                    'Borrowed for health or medical purposes, female (% age 15+)',
+                                    'Coming up with emergency funds in 7 days: possible, female (% age 15+)'
+                                    )
+
+#head(womens_fi) ### to view first 6 output
+#view(womens_fi) ### view resulting data frame
+
+#--- using filter function to only keep data from years 2017 and 2021
+womens_fi <- womens_fi |>
+  filter(Year > 2014 & Year < 2022)
+
+#view(womens_fi) ### view resulting data frame 
+
+
+### ---------------------------------- Renaming the variables
+#--- To ensure our primary data set is easy to read and comprehend to anyone reading, we are renaming each variable with a new name that is short and concise
+renamed_womens_fi <- womens_fi |>
+  rename(country = 'Country name',
+         country_code = 'Country code',
+         year = 'Year',
+         adult_population = 'Adult populaiton',
+         income_group = 'Income group',
+         fin_account = 'Financial institution account, female (% age 15+)',
+         borrowing_rate = 'Borrowed from a formal financial institution, female (% age 15+)',
+         savings = 'Saved at a financial institution, female (% age 15+)',
+         debit_card = 'Owns a debit card, female (% age 15+)',
+         credit_card = 'Owns a credit card, female (% age 15+)',
+         housing_loan = 'Has an outstanding housing loan, female (% age 15+)',
+         internet = 'Used a mobile phone or the internet to buy something online, female (% age 15+)',
+         digi_payment = 'Made or received a digital payment, female (% age 15+)',
+         oldage_savings = 'Saved for old age, female (% age 15+)',
+         borrowed_med = 'Borrowed for health or medical purposes, female (% age 15+)',
+         borrowed_fam_friends = 'Borrowed from family or friends, female (% age 15+)',
+         emergency = 'Coming up with emergency funds in 7 days: possible, female (% age 15+)'
+  )
+
+#head(renamed_womens_fi) ### to view first 6 output
+
+
+###----------------------------------- Replacing NA's with zero's
+#--- We replaced all NAs in the selected variables with 0
+columns_to_replace_women <- c('fin_account', 
+                        'borrowing_rate',
+                        'savings',
+                        'debit_card',
+                        'credit_card',
+                        'housing_loan',
+                        'internet',
+                        'digi_payment',
+                        'oldage_savings',
+                        'borrowed_med',
+                        'borrowed_fam_friends',
+                        'emergency')
+
+renamed_womens_fi[columns_to_replace_women][is.na(renamed_womens_fi[columns_to_replace_women])] <- 0
+
+#view(renamed_womens_fi) ### view resulting data frame
+
+
+### ------------------------------ Single Variable Termed fin_inclusion_index
+#---- Here we reusing code from above to create a new variable coined 'fin_inclusion_index' capturing all the weights from the global health article out of all variables and their listed weights in PC1 and PC2
+females_FI = renamed_womens_fi |>
+  mutate(fin_inclusion_index_women = fin_account * 0.259 +
+           borrowing_rate * 0.261 +
+           savings * 0.268 +
+           debit_card * 0.264 +
+           credit_card * 0.263 +
+           housing_loan * 0.248 +
+           internet * 0.272 +
+           digi_payment * 0.264 +
+           oldage_savings * 0.255 +
+           emergency * -0.234 +
+           borrowed_med * 0.312 +
+           borrowed_fam_friends * 0.368)
+
+#view(females_FI) ### view resulting data frame
+
+
+###--- creating new data frame 
+fin_countries_years_women <- females_FI |>
+  select(country, year, fin_inclusion_index_women)
+
+fin_countries_years_women
+
+#view(fin_countries_years_women) ### view resulting data frame
+summary(fin_countries_years_women) 
+
+
+#--- plotting histogram to chart the female financial inclusion index
+ggplot(fin_countries_years_women, aes(fin_inclusion_index_women)) +
+  geom_histogram() +
+  theme_classic()                       # data is evidently right skewed
+
+
+#--- we calculated financial inclusion by year for all countries
+finincl_by_year_women = fin_countries_years_women |>
+  group_by(year) |>
+  summarise(mean_fin_in = mean(fin_inclusion_index_women))
+
+finincl_by_year_women
+# view(finincl_by_year_women) ### view resulting data frame
+
+#--- we calculated MEAN or AVERAGE financial inclusion by country by year
+finincl_by_year_country_women = fin_countries_years_women |>
+  group_by(country, year) |>
+  summarise(mean_fin_in = mean(fin_inclusion_index_women))
+
+finincl_by_year_country_women
+
+# this above data set was in long format, so 
+# we converted that to a wide format so that
+# we could have data on years in two columns
+# hence the name 
+two_columns_women = finincl_by_year_country_women |>
+  pivot_wider(names_from = year,
+              values_from = mean_fin_in)
+
+#view(two_columns_women) ### view resulting data frame
+
+#--- We have renamed 2017 to precovid, and so on
+pre_during_covid_women = two_columns_women |>
+  rename(pre_covid_index = `2017`,
+         during_covid_index = `2021`) |>
+  select(country, pre_covid_index, during_covid_index)
+
+#head(pre_during_covid_women) ### shows the first six outputs
+#view(pre_during_covid_women) ### view resulting data frame
+
+#--- which countries had lowered indexes during covid compared with pre-covid?
+low_index_countries_women = pre_during_covid_women |>
+  mutate(index_dropped = (during_covid_index < pre_covid_index))
+
+#--- filter out NAs
+low_index_filtered_women = drop_na(low_index_countries_women)
+
+#head(low_index_filtered_women) ### shows the first six outputs
+#view(low_index_filtered_women) ### view resulting data frame
+
+#--- check the counts of which countries have dropped their FI score
+index_dropped_count_women = low_index_filtered_women |>
+  group_by(index_dropped) |>
+  summarise(n = n())
+
+index_dropped_count_women 
+
+
+#--- for which countries had index dropped?
+countries_for_whom_dropped_women = low_index_filtered_women |>
+  filter(index_dropped == TRUE) |>
+  select(country)
+
+# to view which countries had index dropped
+#view(countries_for_whom_dropped_women) ### view resulting data frame
+
+#--- to view countries where index increased for womens population
+countries_for_whom_increased_women = low_index_filtered_women |>
+  filter(index_dropped == FALSE) |>
+  select(country)
+
+#view(countries_for_whom_increased_women) ### view resulting data frame
+```
+
+### Low-income Adults FI Data Processing
+
+The following chunk of code follows the same purpose of building a financial inclusion index to measure financial inclusion among the low-income adult population of data found in the GFD. The code begins by creating a new data frame consisting of the 12 variables, as previously extracted above, which has taken influenced from the first and second principle components that best explain the variance in the data within the Watkins et al., (2023) paper.
+
+```{r calculating_pc_poorest}
+ 
+###----------------- Extracting appropriate variables from DatabankWide dataset
+#--- Variable data frame for women's financial inclusion index numbers
+poorest_fi <- DatabankWide |> select('Country name',
+                                    'Country code',
+                                    'Year',
+                                    'Adult populaiton',
+                                    'Income group',
+                                    'Financial institution account, income, poorest 40% (% ages 15+)',
+                                    'Borrowed from a formal financial institution, income, poorest 40% (% ages 15+)',
+                                    'Saved at a financial institution, income, poorest 40% (% ages 15+)',
+                                    'Owns a debit card, income, poorest 40% (% ages 15+)',
+                                    'Owns a credit card, income, poorest 40% (% ages 15+)',
+                                    'Has an outstanding housing loan, income, poorest 40% (% ages 15+)',
+                                    'Used a mobile phone or the internet to buy something online, income, poorest 40% (% ages 15+)',
+                                    'Made or received a digital payment, income, poorest 40% (% ages 15+)',
+                                    'Saved for old age, income, poorest 40% (% ages 15+)',
+                                    'Borrowed from family or friends, income, poorest 40% (% ages 15+)',
+                                    'Borrowed for health or medical purposes, income, poorest 40% (% ages 15+)',
+                                    'Coming up with emergency funds in 7 days: possible, income, poorest 40% (% ages 15+)'
+                                    )
+
+#head(poorest_fi) ### to view first 6 output
+#view(poorest_fi) ### view resulting data frame
+
+#--- using filter function to only keep data from years 2017 and 2021
+poorest_fi <- poorest_fi |>
+  filter(Year > 2014 & Year < 2022)
+
+#view(poorest_fi) ### view resulting data frame
+
+
+### ----------------------------------- Renaming the variables
+#--- To ensure our primary data set is easy to read and comprehend to anyone reading, we are renaming each variable with a new name that is short and concise
+renamed_poorest_fi <- poorest_fi |>
+  rename(country = 'Country name',
+         country_code = 'Country code',
+         year = 'Year',
+         adult_population = 'Adult populaiton',
+         income_group = 'Income group',
+         fin_account = 'Financial institution account, income, poorest 40% (% ages 15+)',
+         borrowing_rate = 'Borrowed from a formal financial institution, income, poorest 40% (% ages 15+)',
+         savings = 'Saved at a financial institution, income, poorest 40% (% ages 15+)',
+         debit_card = 'Owns a debit card, income, poorest 40% (% ages 15+)',
+         credit_card = 'Owns a credit card, income, poorest 40% (% ages 15+)',
+         housing_loan = 'Has an outstanding housing loan, income, poorest 40% (% ages 15+)',
+         internet = 'Used a mobile phone or the internet to buy something online, income, poorest 40% (% ages 15+)',
+         digi_payment = 'Made or received a digital payment, income, poorest 40% (% ages 15+)',
+         oldage_savings = 'Saved for old age, income, poorest 40% (% ages 15+)',
+         borrowed_med = 'Borrowed for health or medical purposes, income, poorest 40% (% ages 15+)',
+         borrowed_fam_friends = 'Borrowed from family or friends, income, poorest 40% (% ages 15+)',
+         emergency = 'Coming up with emergency funds in 7 days: possible, income, poorest 40% (% ages 15+)'
+  )
+
+#head(renamed_poorest_fi) ### to view first 6 output
+#view(renamed_poorest_fi) ### view resulting data frame
+
+
+###------------------------------------ Replacing NA's with zero's
+#--- We replaced all NAs in the selected variables with 0
+columns_to_replace_poor <- c('fin_account', 
+                        'borrowing_rate',
+                        'savings',
+                        'debit_card',
+                        'credit_card',
+                        'housing_loan',
+                        'internet',
+                        'digi_payment',
+                        'oldage_savings',
+                        'borrowed_med',
+                        'borrowed_fam_friends',
+                        'emergency')
+
+renamed_poorest_fi[columns_to_replace_poor][is.na(renamed_poorest_fi[columns_to_replace_poor])] <- 0
+
+#view(renamed_poorest_fi) ### view resulting data frame
+
+
+### ------------------------------ Single Variable Termed fin_inclusion_index
+#---- Here we reusing code from above to create a new variable coined 'fin_inclusion_index' capturing all the weights from the global health article out of all variables and their listed weights in PC1 and PC2
+poorest_FI = renamed_poorest_fi |>
+  mutate(fin_inclusion_index_poorest = fin_account * 0.259 +
+           borrowing_rate * 0.261 +
+           savings * 0.268 +
+           debit_card * 0.264 +
+           credit_card * 0.263 +
+           housing_loan * 0.248 +
+           internet * 0.272 +
+           digi_payment * 0.264 +
+           oldage_savings * 0.255 +
+           emergency * -0.234 +
+           borrowed_med * 0.312 +
+           borrowed_fam_friends * 0.368)
+
+#view(poorest_FI) ### view resulting data frame
+
+
+###---------------------------------------- Creating new variable 
+#--- Here we are creating a new dataset that is containing year, country, financial index columns only from the last previous data frame made above. 
+fin_countries_years_poorest <- poorest_FI |>
+  select(country, year, fin_inclusion_index_poorest)
+
+fin_countries_years_poorest
+#view(fin_countries_years_poorest) ### view resulting data frame
+summary(fin_countries_years_poorest) # summarising variable, good for statistical analysis
+
+
+#--- Plotting histogram to chart the female financial inclusion index
+ggplot(fin_countries_years_poorest, aes(fin_inclusion_index_poorest)) +
+  geom_histogram() +
+  theme_classic()                       # data is evidently right skewed
+
+
+#--- we calculated financial inclusion by year for all countries
+finincl_by_year_poorest = fin_countries_years_poorest |>
+  group_by(year) |>
+  summarise(mean_fin_in = mean(fin_inclusion_index_poorest))
+
+finincl_by_year_poorest
+#view(finincl_by_year_poorest) ### view resulting data frame
+
+#--- we calculated MEAN or AVERAGE financial inclusion by country by year
+finincl_by_year_country_poorest = fin_countries_years_poorest |>
+  group_by(country, year) |>
+  summarise(mean_fin_in = mean(fin_inclusion_index_poorest))
+
+finincl_by_year_country_poorest
+#view(finincl_by_year_country_poorest) ### view resulting data frame
+
+# this above data set was in long format, so 
+# we converted that to a wide format so that
+# we could have data on years in two columns
+# hence the name 
+two_columns_poorest = finincl_by_year_country_poorest |>
+  pivot_wider(names_from = year,
+              values_from = mean_fin_in)
+
+#view(two_columns_poorest) ### view resulting data frame
+
+#--- We have renamed 2017 to precovid, and so on
+pre_during_covid_poorest = two_columns_poorest |>
+  rename(pre_covid_index = `2017`,
+         during_covid_index = `2021`) |>
+  select(country, pre_covid_index, during_covid_index)
+
+#head(pre_during_covid_poorest) ### shows first six outputs
+#view(pre_during_covid_poorest) ### view resulting data frame
+
+#--- which countries had lowered indexes during covid compared with pre-covid?
+low_index_countries_poorest = pre_during_covid_poorest |>
+  mutate(index_dropped = (during_covid_index < pre_covid_index))
+
+#--- filter out NAs
+low_index_filtered_poorest = drop_na(low_index_countries_poorest)
+
+#head(low_index_filtered_poorest) ### shows the first six outputs
+#view(low_index_filtered_poorest) ### view resulting data framev
+
+#--- To check the counts of which countries have dropped its financial inclusion index
+#--- hence grouping it by which countries dropped its index and counting its total by summarise() function
+index_dropped_count_poorest = low_index_filtered_poorest |>
+  group_by(index_dropped) |>
+  summarise(n = n())
+
+index_dropped_count_poorest 
+#view(index_dropped_count_poorest) ### view resulting data frame
+
+#--- for which countries had index dropped?
+countries_for_whom_dropped_poorest = low_index_filtered_poorest |>
+  filter(index_dropped == TRUE) |>
+  select(country)
+
+#--- to view which countries had index dropped
+knitr::kable(countries_for_whom_dropped_poorest) # to view which countries had index dropped
+#view(countries_for_whom_dropped_poorest) ### view resulting data frame
+
+
+#--- to view which countries had an increase in FI for poorest adults 
+countries_for_whom_increased_poorest = low_index_filtered_poorest |>
+  filter(index_dropped == FALSE) |>
+  select(country)
+
+#view(countries_for_whom_increased_poorest) ### view resulting data frame
+
+```
+
+## Exploratory Data Analysis (EDA)
+
+### 1. Regions by Global Country Classification
+
+We used the New World Bank country classifications by income level for the year 2022-2023 (Hamadeh et al., 2022) to categorize all countries within the General Population, Women, and Low-Income Adults' data frames according to their respective regions. It is important to note that these regional classifications include economies at various income levels.
+
+Our objective is to assess the financial inclusion index rates of countries within each region, focusing on distinct target populations such as the general population, women, and low-income adults. This approach facilitates meaningful comparisons among countries sharing the same geographic regions, enabling us to discern best practices and areas requiring improvement. Furthermore, it offers valuable insights for policymakers, helping them in tailoring financial inclusion policies to address specific regional or national needs and challenges, thus fostering more effective interventions.
+
+Additionally, this analysis serves to reduce disparities by identifying discrepancies in financial access and usage, thereby enabling the development of strategies to reduce inequalities both within and between regions. The potential applications of these insights are multifaceted and contingent on researchers' objectives, highlighting the importance of understanding and pursuing further research based on these findings.
+
+```{r country_fi_by_region}
+
+#--- Creating a new dataframe according to the World Bank region classifications of countries
+east_asia_and_pacific <- data.frame(  country = c("America Samoa", "Australia", "Brunei Darussalam", "Cambodia", "China", "Fiji", "French Polynesia", "Guam", "Hong Kong SAR, China", "Indonesia", "Japan", "Kiribati", "Korea, Rep.", "Lao PDR", "Macao SAR, China", "Malaysia", "Marshall Islands", "Micronesia, Fed. Sts.", "Mongolia", "Myanmar", "Nauru", "New Caledonia", "New Zealand", "Northern Mariana Islands", "Palau", "Philippines", "Samoa", "Singapore", "Solomon Islands", "Taiwan, China", "Thailand", "Timor-Leste", "Papa New Guinea", "Tonga", "Tuvalu", "Vanuatu", "Vietnam"),  region = "east asia and pacific")
+
+#view(east_asia_and_pacific) ### view resulting data frame
+
+
+#--- Europe and Central Asia countries data frame
+europe_central_asia <- data.frame(country = c('Albania', 'Andorra', 'Armenia', 'Austria', 'Azerbaijan', 'Belarus', 'Belgium', 'Bosnia and Herzegovina', 'Buglaria', 'Channel Islands', 'Croatia', 'Cyprus', 'Czech Republic', 'Demark', 'Estonia', 'Faroe Islands', 'Finland' ,'France', 'Georgia', 'Germany', 'Gibraltar', 'Greece', 'Greenland',' Hungary', 'Iceland', 'Ireland', 'Isle of Man', 'Italy', 'Kazakhstan', 'Kosovo', 'Kyrgyz Republic', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Moldova', 'Monaco', 'Montenegro', 'Netherlands', 'North Macedonia', 'Norway', 'Poland', 'Portugal', 'Romania', 'Russia', 'San Marino', 'Serbia', 'Slovak Republic', 'Slovenia', 'Spain', 'Sweden', 'Switzerland', 'Tajikistan', 'Turkey', 'Turkenistan', 'Ukraine', 'United Kingdom'),
+                                  region = 'europe central asia')
+
+#View(europe_central_asia) ### view resulting data frame
+
+
+#--- Northern American countries data frame
+north_america <- data.frame(country = c('Bermunda', 'Canada', 'United States'), 
+                            region = 'nothern america')
+
+#view(north_america) ### view resulting data frame
+
+
+#--- South Asia countries data frame
+south_asia <- data.frame(country = c('Afghanistan', 'India', 'Pakistan', 'Bangladesh', 'Maldives', 'Sri Lanka', 'Bhutan', 'Nepal'), 
+                         region = 'south asia')
+
+#view(south_asia) ### view resulting data frame
+
+
+#--- latin americo and the caribbean dataframe
+latin_america_and_the_caribbean <- data.frame(country = c("Antigua and Barbuda", "Argentina", "Aruba", "Bahamas, The", "Barbados", "Belize", "Bolivia", "Brazil", "British Virgin Islands", "Cayman Islands", "Chile", "Colombia", "Costa Rica", "Cuba", "Curacao", "Dominica", "Dominican Republic", "Ecuador", "El Salvador", "Grenada", "Guatemala", "Guyana", "Haiti", "Honduras", "Jamaica", "Mexico", "Nicaragua", "Panama", "Paraguay", "Peru", "Puerto Rico", "Sint Maarten (Dutch part)", "St. Kitts and Nevis", "St. Lucia", "St. Martin (French part)", "St. Vincent and the Grenadines", "Suriname", "Trinidad and Tobago", "Turks and Caicos Islands", "Uruguay", "Venezuela, RB", "Virgin Islands (U.S.)"),  region = "latin america and the caribbean"  )  
+
+#view(latin_america_and_the_caribbean) ### view resulting data frame
+
+
+#--- middle east and north africa dataframe
+middle_east_and_north_africa <- data.frame(country = c("Algeria", "Bahrain", "Djibouti", "Egypt, Arab Rep.", "Iran, Islamic Rep.", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon", "Libya", "Malta", "Morocco", "Oman", "Qatar", "Saudi Arabia", "Syrian Arab Republic", "Tunisia", "United Arab Emirates", "West Bank and Gaza", "Yemen, Rep."),  region = 'middle east and north africa')
+
+#view(middle_east_and_north_africa) ### view resulting data frame
+
+
+#--- sub sahran africa dataframe
+sub_saharan_africa <- data.frame(country = c("Angola", "Benin", "Botswana", "Burkina", "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros", "Congo, Dem. Rep.", "Congo, Rep", "Côte d'Ivoire", "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia", "Gabon", "Gambia, The", "Ghana", "Guinea", "Guinea-Bissau", "Kenya", "Lesotho", "Liberia", "Madagascar", "Malawi", "Mali", "Mauritania", "Mauritius", "Mozambique", "Namibia", "Niger", "Nigeria", "Rwanda", "São Tomé and Principe", "Senegal", "Seychelles", "Sierra Leone", "Somalia", "South Africa", "South Sudan", "Sudan", "Tanzania", "Togo", "Uganda", "Zambia", "Zimbabwe"),  region = 'sub saharan africa')
+
+#view(sub_saharan_africa) ### view resulting data frame
+
+
+#--- combining all seven regions together to create one main data set. This will ultimately help us to identify which specific regions have seen an increase and decrease in FI pre/during COVID
+countries_by_region <- list(south_asia, north_america, europe_central_asia, sub_saharan_africa, middle_east_and_north_africa, latin_america_and_the_caribbean, east_asia_and_pacific)
+
+combined_regions <- bind_rows(countries_by_region)
+#view(combined_regions) ### view resulting data frame
+```
+
+#### General Population Data Frame
+
+Exploring the differences in mean financial inclusion index of countries by region for the general population in 2017 and 2021.
+
+```{r general_fi_by_region}
+
+#----------------------------- Working on the General Population Data Frame
+
+#--- Combining the country_by_regions and finincl_by_year_country
+mean_index_region <- inner_join(combined_regions, finincl_by_year_country, by = 'country')
+
+#view(mean_index_region) ### view resulting data frame
+
+mean_index_region <- mean_index_region |> select(-'country') # drop selected column
+
+#view(mean_index_region) ### view resulting data frame
+
+#--- Regions are repeated by how many values are contained in column 2017 and 2021
+#--- Used pivot_wider function to separate the years into two columns
+wide_general_mean_findex <- mean_index_region |>
+  group_by(region, year) |>
+  mutate(rowid = row_number()) |> # assigns unique row number to each row within each group.
+  pivot_wider(names_from = year, values_from = mean_fin_in) |> # reshape dataframe
+  select(-rowid) 
+
+
+#--- Renaming columns
+colnames(wide_general_mean_findex) <- c('region', 'mean_findex_pre', 'mean_findex_during')
+
+#view(wide_general_mean_findex) ### view resulting data frame
+
+
+#--- Grouping countries by region and looking at its mean FI index for General Pop. 2021
+general_mean_pre_findex <- wide_general_mean_findex |>
+  group_by(region) |>
+  summarise(mean_region_findex_pre = mean(mean_findex_pre, na.rm = T))
+
+#view(general_mean_pre_findex) ### view resulting data frame
+
+
+#--- Grouping countries by region and looking at its mean FI index for General Pop. 2021
+general_mean_during_findex <- wide_general_mean_findex |>
+  group_by(region) |>
+  summarise(mean_region_findex_during = mean(mean_findex_during, na.rm = T))
+
+#view(general_mean_during_findex) ### view resulting data frame
+
+#--- Combining the mean financial inclusion index of countries by region for both 2017 and 2021
+general_region_mean_findex <- inner_join(general_mean_pre_findex, general_mean_during_findex, by = 'region')
+
+#view(general_region_mean_findex) ### view resulting data frame
+knitr::kable(general_region_mean_findex)
+```
+
+#### Women Data Frame
+
+Exploring the differences in mean financial inclusion index of countries by region for the women population in 2017 and 2021.
+
+```{r women_fi_by_region}
+
+#-------------------------------- Working on the Women FI Index Dataframe
+
+#--- Combining the country_by_regions and finincl_by_year_country FOR WOMEN FI
+mean_index_region_women <- inner_join(combined_regions, finincl_by_year_country_women, by = 'country')
+
+#view(mean_index_region_women) ### view resulting data frame
+
+mean_index_region_women <- mean_index_region_women |> select(-'country') # drop selected column
+
+#View(mean_index_region_women) ### view resulting data frame
+
+
+#--- Regions are repeated by how many values are contained in column 2017 and 2021
+#--- Used pivot_wider function to separate the years into two columns
+wide_women_mean_findex <- mean_index_region_women |>
+  group_by(region, year) |>
+  mutate(rowid = row_number()) |> # assigns unique row number to each row within each group.
+  pivot_wider(names_from = year, values_from = mean_fin_in) |> # reshape dataframe
+  select(-rowid) 
+
+
+#--- Renaming columns
+colnames(wide_women_mean_findex) <- c('region', 'mean_findex_pre', 'mean_findex_during')
+
+#view(wide_women_mean_findex) ### view resulting data frame
+
+
+#--- Grouping countries by region and looking at its mean FI index for Women 2017
+women_mean_pre_findex <- wide_women_mean_findex |>
+  group_by(region) |>
+  summarise(mean_region_findex_pre = mean(mean_findex_pre, na.rm = T))
+
+#view(women_mean_pre_findex) ### view resulting data frame
+
+
+#--- Grouping countries by region and looking at its mean FI index for Women 2021
+women_mean_during_findex <- wide_women_mean_findex |>
+  group_by(region) |>
+  summarise(mean_region_findex_during = mean(mean_findex_during, na.rm = T))
+
+#view(women_mean_during_findex) ### view resulting data frame
+
+#--- Combining the mean financial inclusion index of countries by region for both 2017 and 2021
+women_region_mean_findex <- inner_join(women_mean_pre_findex, women_mean_during_findex, by = 'region')
+
+#view(women_region_mean_findex) ### view resulting data frame
+knitr::kable(women_region_mean_findex)
+
+```
+
+#### Low-Income Adults Data Frame
+
+Exploring the differences in mean financial inclusion index of countries by region for the poorest adults population in 2017 and 2021.
+
+```{r poorest_fi_by_region}
+
+#-------------------------------- Working on the Poorest Adults FI Index Dataframe
+
+#--- Combining the country_by_regions and finincl_by_year_country for Poorest Adults Dataframe
+mean_index_region_poorest <- inner_join(combined_regions, finincl_by_year_country_poorest, by = 'country')
+
+#view(mean_index_region_poorest) ### view resulting data frame
+
+mean_index_region_poorest <- mean_index_region_poorest |> select(-'country') # drop selected column
+
+#view(mean_index_region_poorest) ### view resulting data frame
+
+
+#--- Regions are repeated by how many values are contained in column 2017 and 2021
+#--- Used pivot_wider function to separate the years into two columns
+wide_poorest_mean_findex <- mean_index_region_poorest |>
+  group_by(region, year) |>
+  mutate(rowid = row_number()) |> # assigns unique row number to each row within each group.
+  pivot_wider(names_from = year, values_from = mean_fin_in) |> # reshape dataframe
+  select(-rowid) 
+
+
+#--- Renaming columns
+colnames(wide_poorest_mean_findex) <- c('region', 'mean_findex_pre', 'mean_findex_during')
+
+#view(wide_poorest_mean_findex) ### view resulting data frame
+
+
+#--- Grouping countries by region and looking at its mean FI index for Poorest Adult 2017
+poorest_mean_pre_findex <- wide_poorest_mean_findex |>
+  group_by(region) |>
+  summarise(mean_region_findex_pre = mean(mean_findex_pre, na.rm = T))
+
+#view(poorest_mean_pre_findex) ### view resulting data frame
+
+
+#--- Grouping countries by region and looking at its mean FI index for Poorest Adult 2021
+poorest_mean_during_findex <- wide_poorest_mean_findex |>
+  group_by(region) |>
+  summarise(mean_region_findexduring = mean(mean_findex_during, na.rm = T))
+
+#view(poorest_mean_during_findex) ### view resulting data frame
+
+
+#--- Combining the mean financial inclusion index of countries by region for both 2017 and 2021
+poorest_region_mean_findex <- inner_join(poorest_mean_pre_findex, poorest_mean_during_findex, by = 'region')
+
+#view(poorest_region_mean_findex) ### view resulting data frame
+knitr::kable(poorest_region_mean_findex)
+
+```
+
+### 1.1 Region Data Visualization Analysis
+
+This section examines the statistical data visualization of countries' financial inclusion (FI) index rates by region. According to the section on country-by-region FI index rates, we observed a decrease in the mean FI across all seven region groups within the GFD for all three focus groups. This suggests that, on average, most countries experienced a decrease in their FI index rate. Consequently, most regional groups exhibited an overall decrease both before and during COVID-19.
+
+#### General Population: Financial Inclusion Index Scores by Region
+
+```{r general_graphical_analysis}
+
+#--- Removing NA values in the dataframe
+#view(wide_general_mean_findex) ### view resulting data frame
+
+wide_general_mean_findex_no_na <- na.omit(wide_general_mean_findex)
+
+#view(wide_general_mean_findex_no_na) ### view resulting data frame
+
+
+#--- Removing NA values in the dataframe
+#view(mean_index_region)
+
+mean_index_region_no_na <- na.omit(mean_index_region)
+
+#view(mean_index_region_no_na)
+
+
+###-------------- 'Grouped Boxplot' for General Mean Findex Boxplot for both 2017 and 2021
+###---------------- Using Plotly Package to General FI Index by Region 2017 & 2021
+plotly_general_region_fi <- mean_index_region_no_na %>%
+  mutate(year = factor(year, levels = c("2017", "2021"))) %>%
+  plot_ly(x = ~region, y = ~mean_fin_in, 
+          type = "box", color = ~factor(year)) %>%
+  ### add graph descriptions
+  layout(xaxis = list(title = "Country by Region"),
+         yaxis = list(title = "Mean Findex"),
+         title = "Mean Financial Inclusion Index of the General Population",
+         legend = list(title = "Year"),
+         showlegend = TRUE) 
+
+#--- computes the mean values for each region-year combination
+general_mean_values <- mean_index_region_no_na %>%
+  group_by(region, year) %>%
+  summarize(mean_fin_in = mean(mean_fin_in))
+
+#--- add mean values scatter plot trace in the boxplot
+plotly_general_region_fi <- plotly_general_region_fi %>%
+  add_trace(data = general_mean_values, x = ~region, y = ~mean_fin_in, 
+            type = "scatter", mode = "markers", marker = list(size = 10))
+
+#--- view interactive graph
+plotly_general_region_fi
+
+
+```
+
+#### Women Population: Financial Inclusion Index Scores by Region
+
+```{r women_graphical_analysis}
+
+#--- Removing NA values in the dataframe
+#view(wide_women_mean_findex) ### view resulting data frame
+ 
+wide_women_mean_findex_no_na <- na.omit(wide_women_mean_findex)
+
+#view(wide_women_mean_findex_no_na) ### view resulting data frame
+
+
+#--- Removing NA values in the dataframe
+#view(mean_index_region_women) ### view resulting data frame
+
+mean_index_region_women_no_na <- na.omit(mean_index_region_women)
+
+#view(mean_index_region_women_no_na) ### view resulting data frame
+
+
+###-------------- 'Grouped Boxplot' for Women Mean Findex Boxplot for both 2017 and 2021
+###---------------- Using Plotly Package to Women FI Index by Region 2017 & 2021
+plotly_women_region_fi <- mean_index_region_women_no_na %>%
+  mutate(year = factor(year, levels = c("2017", "2021"))) %>%
+  plot_ly(x = ~region, y = ~mean_fin_in, 
+          type = "box", color = ~factor(year)) %>%
+  ### add graph descriptions
+  layout(xaxis = list(title = "Country by Region"),
+         yaxis = list(title = "Mean Findex"),
+         title = "Mean Financial Inclusion Index of the Women Population",
+         legend = list(title = "Year"),
+         showlegend = TRUE) 
+#--- computes the mean values for each region-year combination
+women_mean_values <- mean_index_region_women_no_na %>%
+  group_by(region, year) %>%
+  summarize(mean_fin_in = mean(mean_fin_in))
+
+#--- add mean values scatter plot trace in the boxplot ########
+plotly_women_region_fi <- plotly_women_region_fi %>%
+  add_trace(data = women_mean_values, x = ~region, y = ~mean_fin_in, 
+            type = "scatter", mode = "markers", marker = list(size = 10))
+
+#--- view interactive graph
+plotly_women_region_fi
+
+
+```
+
+#### Low-Income Adults Population: Financial Inclusion Index Scores by Region
+
+```{r poorest_graphical_analysis}
+
+#--- Removing NA values in the dataframe
+#view(wide_poorest_mean_findex) ### view resulting data frame
+
+#wide_poorest_mean_findex_no_na <- na.omit(wide_poorest_mean_findex)
+
+#view(wide_poorest_mean_findex_no_na) ### view resulting data frame
+
+
+#--- Removing NA values in the dataframe
+#view(mean_index_region_poorest) ### view resulting data frame
+
+mean_index_region_poorest_no_na <- na.omit(mean_index_region_poorest)
+
+#view(mean_index_region_poorest_no_na) ### view resulting data frame
+
+
+
+###-------------- 'Grouped Boxplot' for Poorest Mean Findex Boxplot for both 2017 and 2021
+###---------------- Using Plotly Package to Poorest FI Index by Region 2017 & 2021
+plotly_poorest_region_fi <- mean_index_region_poorest_no_na %>%
+  mutate(year = factor(year, levels = c("2017", "2021"))) %>%
+  plot_ly(x = ~region, y = ~mean_fin_in, 
+          type = "box", color = ~factor(year)) %>%
+  ### add graph descriptions
+  layout(xaxis = list(title = "Country by Region"),
+         yaxis = list(title = "Mean Findex"),
+         title = "Mean Financial Inclusion Index of the Poorest Population",
+         legend = list(title = "Year"),
+         showlegend = TRUE) 
+
+
+#--- computes the mean values for each region-year combination
+poorest_mean_values <- mean_index_region_poorest_no_na %>%
+  group_by(region, year) %>%
+  summarize(mean_fin_in = mean(mean_fin_in))
+
+#--- add mean values scatter plot trace in the boxplot ########
+plotly_poorest_region_fi <- plotly_poorest_region_fi %>%
+  add_trace(data = poorest_mean_values, x = ~region, y = ~mean_fin_in, 
+            type = "scatter", mode = "markers", marker = list(size = 10))
+
+#--- view interactive graph
+plotly_poorest_region_fi
+
+
+```
+
+### 1.2 Comparing regions by FI scores for all focus populations with a boxplot in one graph
+
+```{r boxplot_for_all_groups_region}
+
+#--- retrieving data for all population groups, only looking at scores from 2021
+
+general_during <- na.omit(pre_during_covid) %>% select(-pre_covid_index) %>% inner_join(combined_regions, pre_during_covid, by = 'country')
+
+women_during <- na.omit(pre_during_covid_women) %>% select(-pre_covid_index) %>% inner_join(combined_regions, pre_during_covid_women, by = 'country')
+
+poor_during <- na.omit(pre_during_covid_poorest) %>% select(-pre_covid_index) %>% inner_join(combined_regions, pre_during_covid_poorest, by = 'country')
+
+#view(poor_during) ### view resulting dataframe
+
+
+#--- combining the three data frames
+combined_boxplots <- rbind(
+  data.frame(population_group = "General", general_during),
+  data.frame(population_group = "Women", women_during),
+  data.frame(population_group = "Low-Income Adults", poor_during)
+  
+)
+
+#view(combined_boxplots) ### view resulting dataframe
+
+#--- defining the desired order of population groups
+desired_order <- c("General", "Women", "Low-Income Adults")
+
+
+#--- converting the "population_group" variable to a factor with the desired order
+combined_boxplots$population_group <- factor(
+  combined_boxplots$population_group, 
+  levels = desired_order
+)
+
+#--- creating graph with multiple boxplots
+all_groups_region <- ggplot(combined_boxplots, aes(x = region, y = during_covid_index, fill = factor(population_group))) +
+  geom_boxplot() +
+  labs(x = "Countries by Region", y = "Mean Findex",
+       title = "Mean Financial Inclusion Index for All Focus Groups",
+       subtitle = "by Region | 2021",
+       caption = "Data: Global Findex Database, The World Bank 2023",
+       fill = 'Population Groups') +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels
+  ### Aadjust size and boldness for the x,y-axis label
+  theme(axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold"),
+        axis.text.x = element_text(angle = 23, hjust = 1, size = 10, face = "bold"),  
+        axis.text.y = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 9, face = "bold"),
+        plot.title = element_text(size = 12, face = "bold")) +  
+  ### adding mean dot for each group
+  stat_summary(fun = mean, geom = "point", shape = 'circle',
+               size = 1.5, position = position_dodge(width = 0.75))
+
+all_groups_region
+
+#--- To visualize it interactively
+all_groups_region <- ggplotly(all_groups_region)
+all_groups_region
+
+
+```
+
+### 2. Income Group by Global Country Classification
+
+We used the GFD (Watkins et al, 2023) to categorize all countries within the General Population, Women, and Low-Income Adults' data frames according to their respective income group. The GFD consists of 5 different income groups; Low income, lower middle income, upper middle income, and high income. (NEED TO NOTE HOW FINDEX MEASURE THIS).
+
+Our objective is to assess the financial inclusion index rates of countries by income group, focusing on distinct target populations which include general population, women, and low-income adults. This approach facilitates meaningful comparisons among countries sharing the same income group, potentially revealing whether wealthier countries tend to have higher financial inclusion rates compared to low-income countries. By focusing on women as a distinct target population, this analysis can further highlight gender disparities in financial inclusion, by showing whether women have lower financial inclusion rates compared to the general population. We also gain insights into the challenges faced by more vulnerable populations when assessing financial inclusion rates among low-income adults. This analysis has the potential to reveal whether low-income adults are disproportionately excluded from the financial system, therefore results can guide the development of targeted programs and initiatives to improve financial inclusion among women and low-income adults.
+
+Additionally, this analysis serves to track financial inclusion rates over time within each income group and target population therefore leading to trends and improvements or regressions in financial inclusion efforts. The results from this analysis can be further used to understand the drivers of financial inclusion and its impact on economic development and poverty reduction.
+
+#### General Population Data Frame
+
+Exploring the differences in mean financial inclusion index of countries by income group for the general population in 2017 and 2021.
+
+```{r general_fi_by_income}
+
+#--- Creating new data frame with Income Group and country columns from first original databank data frame
+income_country <- DatabankWide %>%
+  select('Country name', 'Income group') %>%
+  rename('country' = 'Country name')
+
+#View(income_country) ### viewing results of data frame
+
+
+#--- Joining general population data frame that consists of country, year, and mean FI index with the income group, then removing duplicates
+mean_income <- inner_join(income_country, finincl_by_year_country, by = 'country')
+
+mean_income <- distinct(mean_income)
+
+#View(mean_income) ### viewing results of data frame
+
+
+#--- Joining this dataframe with regional data frame to ensure that we are analysing the same countries as we did in the region analysis section above and then removing the region column as it is redundant, renaming Income group column to something more appropriate
+mean_index_income <- inner_join(combined_regions, mean_income, by = 'country')
+
+#View(mean_index_income) ### viewing results of data frame
+
+mean_index_income <- mean_index_income %>% select(-'region', -'country') %>% rename('income_group' = 'Income group')
+
+#View(mean_index_income) ### viewing results of data frame
+
+
+#--- Regions are repeated by how many values are contained in column 2017 and 2021
+#--- Used pivot_wider function to separate the years into two columns
+wide_general_mean_income <- mean_index_income |>
+  group_by(income_group, year) |>
+  mutate(rowid = row_number()) |> # assigns unique row number to each row within each group.
+  pivot_wider(names_from = year, values_from = mean_fin_in) |> # reshape dataframe
+  select(-rowid) 
+
+#View(wide_general_mean_income) ### viewing results of data frame
+
+
+#--- Renaming columns
+colnames(wide_general_mean_income) <- c('income_group', 'mean_findex_pre', 'mean_findex_during')
+
+
+#--- Grouping countries by income group and looking at its mean FI index for General Pop. 2017
+general_mean_pre_income <- wide_general_mean_income |>
+  group_by(income_group) |>
+  summarise(mean_income_findex_pre = mean(mean_findex_pre, na.rm = T))
+
+#view(general_mean_pre_income) ### viewing results of data frame
+
+
+#--- Grouping countries by income group and looking at the mean FI index for General Pop. 2021
+general_mean_during_income <- wide_general_mean_income |>
+  group_by(income_group) |>
+  summarise(mean_income_findex_during = mean(mean_findex_during, na.rm = T))
+
+#view(general_mean_during_income) ### viewing results of data frame
+
+#--- Combining the mean financial inclusion index of countries by region for both 2017 and 2021
+general_income_mean_findex <- inner_join(general_mean_pre_income, general_mean_during_income, by = 'income_group')
+
+general_income_mean_findex <- na.omit(general_income_mean_findex)
+
+#view(general_income_mean_findex) ### viewing results of data frame
+knitr::kable(general_income_mean_findex)
+
+```
+
+#### Women Data Frame
+
+Exploring the differences in mean financial inclusion index of countries by income group for the women population in 2017 and 2021.
+
+```{r women_fi_by_income}
+
+#--- Creating new data frame with Income Group and country columns from first original databank data frame
+income_country <- DatabankWide %>%
+  select('Country name', 'Income group') %>%
+  rename('country' = 'Country name')
+
+
+#--- Joining women population data frame that consists of country, year, and mean FI index with the income group, then removing duplicates
+women_mean_income <- inner_join(income_country, finincl_by_year_country_women, by = 'country')
+
+women_mean_income <- distinct(women_mean_income)
+
+#View(women_mean_income) ### viewing results of data frame
+
+#--- Joining this dataframe with regional data frame to ensure that we are analysing the same countries as we did in the region analysis section above and then removing the region column as it is redundant, renaming Income group column to something more appropriate
+women_mean_index_income <- inner_join(combined_regions, women_mean_income, by = 'country')
+
+#view(women_mean_index_income) ### viewing results of data frame
+
+women_mean_index_income <- women_mean_index_income %>% select(-'region', -'country') %>% rename('income_group' = 'Income group')
+
+#view(women_mean_index_income) ### viewing results of data frame
+
+
+#--- Regions are repeated by how many values are contained in column 2017 and 2021
+#--- Used pivot_wider function to separate the years into two columns
+wide_women_mean_income <- women_mean_index_income |>
+  group_by(income_group, year) |>
+  mutate(rowid = row_number()) |> # assigns unique row number to each row within each group.
+  pivot_wider(names_from = year, values_from = mean_fin_in) |> # reshape dataframe
+  select(-rowid) 
+
+#view(wide_women_mean_income) ### viewing results of data frame
+
+
+#--- Renaming columns
+colnames(wide_women_mean_income) <- c('income_group', 'mean_findex_pre', 'mean_findex_during')
+
+
+#--- Grouping countries by income group and looking at its mean FI index for Women Pop. 2017
+women_pre_income <- wide_women_mean_income |>
+  group_by(income_group) |>
+  summarise(mean_income_findex_pre = mean(mean_findex_pre, na.rm = T))
+
+#view(women_pre_income) ### viewing results of data frame
+
+
+#--- Grouping countries by income group and looking at the mean FI index for Women Pop. 2021
+women_during_income <- wide_women_mean_income |>
+  group_by(income_group) |>
+  summarise(mean_income_findex_during = mean(mean_findex_during, na.rm = T))
+
+view(women_during_income) ### viewing results of data frame
+
+
+#--- Combining the mean financial inclusion index of countries by region for both 2017 and 2021
+women_income_mean_findex <- inner_join(women_pre_income, women_during_income, by = 'income_group')
+
+women_income_mean_findex <- na.omit(women_income_mean_findex)
+
+#view(women_income_mean_findex) ### viewing results of data frame
+knitr::kable(women_income_mean_findex)
+
+
+```
+
+#### Low-Income Adult Data Frame
+
+Exploring the differences in mean financial inclusion index of countries by income group for the low-income population in 2017 and 2021.
+
+```{r poor_fi_by_income}
+
+#--- Creating new data frame with Income Group and country columns from first original databank data frame
+income_country <- DatabankWide %>%
+  select('Country name', 'Income group') %>%
+  rename('country' = 'Country name')
+
+
+#--- Joining low-income adult population data frame that consists of country, year, and mean FI index with the income group, then removing duplicates
+poorest_mean_income <- inner_join(income_country, finincl_by_year_country_poorest, by = 'country') 
+
+poorest_mean_income <- distinct(poorest_mean_income)
+
+#view(poorest_mean_income)  ### view resulting data frame
+
+
+#--- Joining this dataframe with regional data frame to ensure that we are analysing the same countries as we did in the region analysis section above and then removing the region column as it is redundant, renaming Income group column to something more appropriate
+poorest_mean_index_income <- inner_join(combined_regions, poorest_mean_income, by = 'country')
+
+#view(poorest_mean_index_income) ### view resulting data frame
+
+poorest_mean_index_income <- poorest_mean_index_income %>% select(-'region', -'country') %>% rename('income_group' = 'Income group')
+
+#view(poorest_mean_index_income) ### view resulting data frame
+
+
+#--- Regions are repeated by how many values are contained in column 2017 and 2021
+#--- Used pivot_wider function to separate the years into two columns
+wide_poorest_mean_income <- poorest_mean_index_income |>
+  group_by(income_group, year) |>
+  mutate(rowid = row_number()) |> # assigns unique row number to each row within each group.
+  pivot_wider(names_from = year, values_from = mean_fin_in) |> # reshape dataframe
+  select(-rowid) 
+
+#view(wide_poorest_mean_income) ### view resulting data frame
+
+
+#--- Renaming columns
+colnames(wide_poorest_mean_income) <- c('income_group', 'mean_findex_pre', 'mean_findex_during')
+
+
+#--- Grouping countries by income group and looking at its mean FI index for Women Pop. 2017
+poorest_pre_income <- wide_poorest_mean_income |>
+  group_by(income_group) |>
+  summarise(mean_income_findex_pre = mean(mean_findex_pre, na.rm = T))
+
+#view(poorest_pre_income) ### view resulting data frame
+
+
+#--- Grouping countries by income group and looking at the mean FI index for Women Pop. 2021
+poorest_during_income <- wide_poorest_mean_income |>
+  group_by(income_group) |>
+  summarise(mean_income_findex_during = mean(mean_findex_during, na.rm = T))
+
+#view(poorest_during_income) ### view resulting data frame
+
+#--- Combining the mean financial inclusion index of countries by region for both 2017 and 2021
+poorest_income_mean_findex <- inner_join(poorest_pre_income, poorest_during_income, by = 'income_group')
+
+poorest_income_mean_findex <- na.omit(poorest_income_mean_findex)
+
+#view(poorest_income_mean_findex) ### view resulting data frame
+knitr::kable(poorest_income_mean_findex)
+```
+
+### 2.1 Income Group Data Visualization Analysis
+
+This section delves into the statistical data visualization of the country by income group financial inclusion rates. As per the country by region financial inclusion rates section, we have seen a decrease in the mean FI for all of the four income groups within the GFD within all three focus groups. This may mean that on average most countries saw a decrease in their financial inclusion state and therefore most regions AND income groups tended to have an overall decrease pre and during COVID-19.
+
+#### General Population: Financial Inclusion Index Scores by Income Group
+
+```{r income_general_graphic_analysis}
+
+#--- General population mean FI-index by income group 2017
+#view(wide_general_mean_income) ### view resulting data frame
+
+general_wide_no_na <- na.omit(wide_general_mean_income)
+
+#view(general_wide_no_na) ### view resulting data frame
+
+
+###---------------------- Combined Mean Findex Boxplot for both 2017 and 2021
+#view(mean_index_income)   ### view resulting data frame
+
+mean_income_no_na <- na.omit(mean_index_income)   # removing NA's
+
+#view(mean_income_no_na) ### view resulting data frame
+
+
+#--- Producing FINAL boxplot with 2017 and 2021 boxplots combined into the same graph
+general_income_final <- na.omit(mean_income) |> select(-country) |> rename('income_group' = 'Income group')
+
+# view(general_income_final) ### view resulting data frame
+
+custom_colors <- c('purple', 'yellow')
+
+general_income_final_plot <- ggplot(general_income_final, aes(x = reorder(factor(income_group), mean_fin_in), y = mean_fin_in, fill = factor(year))) +
+  geom_boxplot(alpha = 0.5) +
+  geom_smooth(method = 'glm') +
+  labs(
+    x = 'Income Groups -',
+    y = 'Financial Inclusion Index Score -',
+    title = 'General Financial Income Inclusion Index Scores -',
+    subtitle = 'By Income Group | 2017 vs 2021',
+    caption = 'Data: Global Findex Database, The World Bank',
+    fill = 'Year -'
+  ) +
+  scale_fill_manual(values = custom_colors) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = 'black')) +
+  theme(axis.text.y = element_text(color = 'black'))
+
+#--- Display the normal graph
+general_income_final_plot
+
+#--- display it interactively
+ggplotly(general_income_final_plot)
+
+```
+
+#### Women Population: Financial Inclusion Scores by Income Group
+
+```{r income_women_graphic_analysis}
+
+#--- Women population mean FI-index by income group 2017
+#view(wide_women_mean_income) ### view resulting data frame
+
+women_wide_no_na <- na.omit(wide_general_mean_income)
+
+#view(women_wide_no_na) ### view resulting data frame
+
+
+###---------------------- Combined Mean Findex Boxplot for both 2017 and 2021
+#view(women_mean_index_income) ### view resulting data frame
+
+women_mean_income_no_na <- na.omit(women_mean_index_income)   # removing NA's
+
+#view(women_mean_income_no_na) ### view resulting data frame
+
+
+#--- Producing FINAL boxplot with 2017 and 2021 boxplots combined into the same graph for women population
+women_income_final <- na.omit(women_mean_income) |> select(-country) |> rename('income_group' = 'Income group')
+
+#view(women_income_final) ### view resulting data frame
+
+custom_colors <- c('blue', 'red')
+
+women_income_final_plot <- ggplot(women_income_final, aes(x = reorder(factor(income_group), mean_fin_in), y = mean_fin_in, fill = factor(year))) +
+  geom_boxplot(alpha = 0.5, position = position_dodge(width = 0.75)) +
+  geom_smooth(method = 'glm') +
+  labs(
+    x = 'Income Groups -',
+    y = 'Financial Inclusion Index Score -',
+    title = 'Women Financial Income Inclusion Index Scores -',
+    subtitle = 'By Income Group | 2017 vs 2021',
+    caption = 'Data: Global Findex Database, The World Bank',
+    fill = 'Year -'
+  ) +
+  scale_fill_manual(values = custom_colors) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = 'black')) +
+  theme(axis.text.y = element_text(color = 'black'))
+
+#--- Display the normal graph
+women_income_final_plot
+
+#--- display it interactively
+ggplotly(women_income_final_plot) 
+
+```
+
+#### Low-Income Adults Population: Financial Inclusion Index Scores by Income Group
+
+```{r income_poorest_graphic_analysis}
+
+#--- Low Income adults population mean FI-index by income group 2017
+#view(wide_poorest_mean_income) ### view resulting data frame
+
+poorest_wide_no_na <- na.omit(wide_poorest_mean_income)
+
+#view(poorest_wide_no_na) ### view resulting data frame
+
+
+###---------------------- Combined Mean Findex Boxplot for both 2017 and 2021
+#view(poorest_mean_index_income) ### view resulting data frame
+
+poorest_mean_income_no_na <- na.omit(poorest_mean_index_income)   # removing NA's
+
+#view(poorest_mean_income_no_na) ### view resulting data frame
+
+
+#--- Producing FINAL boxplot with 2017 and 2021 boxplots combined into the same graph for low income adult population
+poorest_income_final <- na.omit(poorest_mean_income) |> select(-country) |> rename('income_group' = 'Income group')
+
+#view(poorest_income_final) ### view resulting data frame
+
+custom_colors <- c('green', 'orange')
+
+poorest_income_final_plot <- ggplot(poorest_income_final, aes(x = reorder(factor(income_group), mean_fin_in), y = mean_fin_in, fill = factor(year))) +
+  geom_boxplot(alpha = 0.5) +
+  geom_smooth(method = 'glm') +
+  labs(
+    x = 'Income Groups -',
+    y = 'Financial Inclusion Index Score -',
+    title = 'Financial Inclusion Index Scores by Income Group -',
+    subtitle = 'Low Income Adults Population | 2017 vs 2021',
+    caption = 'Data: Global Findex Database, The World Bank',
+    fill = 'Year -'
+  ) +
+  scale_fill_manual(values = custom_colors) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, color = 'black')) +
+  theme(axis.text.y = element_text(color = 'black'))
+
+#--- Display the normal graph
+poorest_income_final_plot
+
+#--- display it interactively
+ggplotly(poorest_income_final_plot) 
+```
+
+### 2.2 Comparing Income Groups by FI Scores with Boxplots in one graph (2021)
+
+```{r boxplot_for_all_groups_income}
+
+#-------------------------------------- Creating new dataframe
+income_country_2_2 <- DatabankWide %>%
+  select('Country name', 'Income group') %>%
+  rename('country' = 'Country name')
+
+#--- data processing and cleaning for General Population
+general_during_income <- na.omit(pre_during_covid) %>% ### remove NAs
+  select(-pre_covid_index) %>% ### remove specific column
+  inner_join(combined_regions, pre_during_covid, by = 'country') %>% ### combine dataframes
+  inner_join(income_country_2_2, pre_during_covid, by = 'country') ### combine dataframes
+
+#--- remove duplication
+general_during_income <- distinct(general_during_income)
+
+
+#--- data processing and cleaning for Women Population
+women_during_income <- na.omit(pre_during_covid_women) %>% ### remove NAs
+  select(-pre_covid_index) %>% ### remove specific column
+  inner_join(combined_regions, pre_during_covid_women, by = 'country') %>% ### combine dataframes
+  inner_join(income_country_2_2, pre_during_covid_women, by = 'country') ### combine dataframes
+
+#--- remove duplication
+women_during_income <- distinct(women_during_income)
+
+
+#--- data processing and cleaning for Poorest Population
+poor_during_income <- na.omit(pre_during_covid_poorest) %>% ### remove NAs
+  select(-pre_covid_index) %>% ### remove specific column
+  inner_join(combined_regions, pre_during_covid_poorest, by = 'country') %>% ### combine datas
+  inner_join(income_country_2_2, pre_during_covid_poorest, by = 'country') ### combine dataframes
+
+#--- remove duplication
+poor_during_income <- distinct(poor_during_income)
+
+
+#----------------------------- combining the three data frames
+income_combined_boxplots <- rbind(
+  data.frame(population_group = "General", general_during_income),
+  data.frame(population_group = "Women", women_during_income),
+  data.frame(population_group = "Low-Income Adults", poor_during_income))
+
+
+#--- renaming income group column
+income_combined_boxplots <- income_combined_boxplots |> 
+  rename('income_group' = 'Income.group')
+
+
+#--- defining the desired order of population groups
+desired_order <- c("General", "Women", "Low-Income Adults")
+
+
+#--- converting the "population_group" variable to a factor with the desired order
+income_combined_boxplots$population_group <- factor(income_combined_boxplots$population_group, 
+  levels = desired_order)
+
+
+#--- creating the graph with 1 boxplot per focus group
+income_all_groups_plot <- ggplot(income_combined_boxplots %>% na.omit(), 
+       aes(x = reorder(factor(income_group), 
+           during_covid_index), 
+           y = during_covid_index, 
+           fill = population_group)) +
+  geom_boxplot(alpha = 0.5) +
+  geom_smooth(method = 'glm') +
+    labs(x = "Income Group", y = "Mean Findex",
+       title = "Mean Financial Inclusion Index for All Focus Groups",
+       subtitle = "by Income Groups | 2021",
+       caption = "Data: Global Findex Database, The World Bank 2023",
+       fill = 'Population Groups') +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  ### adjust size and boldness for the x,y-axis labes
+  theme(axis.title.x = element_text(size = 12, face = "bold"),
+        axis.title.y = element_text(size = 12, face = "bold"),
+        axis.text.x = element_text(angle = 23, hjust = 1, size = 10, face = "bold"),  
+        axis.text.y = element_text(size = 12, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold"),
+        legend.text = element_text(size = 9, face = "bold"),
+        plot.title = element_text(size = 12, face = "bold")) +
+  ### adding mean dot for each group
+  stat_summary(fun = mean, geom = "point", shape = 'circle', 
+               size = 1.5, position = position_dodge(width = 0.75))
+
+#--- Display the normal graph
+income_all_groups_plot
+
+#--- display it interactively
+ggplotly(income_all_groups_plot) 
+```
+
+### 3. Countries by Global Country Classification
+
+We used the GFD (Watkins et al, 2023) to analyse all countries and their FI scores within the General Population, Women, and Low-Income Adults' data frames. Above we have compared FI scores by income groups and regions. This section primarily focuses on comparing a countries 2017 and 2021 FI score which will then help us to easily identify whether there is a pattern between other various variables and these scores e.g. It may be found that most countries which there is an increase in FI scores, belong to the high income group and the Middle East North African region.
+
+Our objective is to assess the financial inclusion index rates of each country in the FINDEX data base given the country has the appropriate information to analyse and compare FI scores from 2017 and 2021. We will, once again, apply this approach to our three target populations which include general population, women, and low-income adults. This approach facilitates meaningful comparisons among countries with themselves, and fosters in helping to understand whether a country is making financially inclusive improvements. Population-specific analysis can be made when looking at the FI scores of, not only the general population but also women and adults with low income.
+
+This section has more of a focus on qualitative data.
+
+#### General Population: Comparing country FI scores
+
+```{r gen_country_fi_diff}
+
+library(ggrepel) ### used for improving the labeling of data points in your plots created
+
+#--- Retrieving data from General data processing section and placing it into two different data frames; countries that showed a decrease and increase in FI
+#--- data frame consisting of countries in the general pop. where FI has decreased
+general_countries_decreased <- low_index_filtered |>
+  filter(index_dropped == TRUE) |>
+  select(country) 
+
+
+#--- data frame consisting of countries in the general pop. where FI has increased
+geneneral_countries_increased <- low_index_filtered |>
+  filter(index_dropped == FALSE) |>
+  select(country)
+
+
+#--- combining these two data frames with the combined_region data frame so we can see which countries belong to which regions
+general_dec <- merge(combined_regions, general_countries_decreased, by = 'country')
+general_in <- merge(combined_regions, geneneral_countries_increased, by = 'country')
+
+
+#--- retrieving data about pre/during covid FI scores for increased and decreased countries
+general_index_dec <- merge(general_dec, pre_during_covid, by = 'country')
+general_index_in <- merge(general_in, pre_during_covid, by = 'country')
+
+
+#--- filtering out iceland due to invalid values/NA's
+general_index_in <- general_index_in %>% filter(country != 'Iceland')
+#view(general_index_in) ### view resulting dataframe
+
+
+#--- combining two data frames from above
+combined_general <- rbind(general_index_in, general_index_dec)
+
+#view(combined_general) ### view resulting dataframe
+
+
+#--- creating new column that displays change in FI score
+combined_general <- combined_general %>% 
+  mutate(change = case_when(pre_covid_index < during_covid_index ~ 'increasing', 
+                            pre_covid_index > during_covid_index ~ 'decreasing',
+                            TRUE ~ 'stable'))
+#view(combined_general) ### view resulting dataframe
+
+
+#--- creating new variable that turns the combined data frame to a long tibble and mutates a new column to identify an increase/decrease
+long_gen_count <- combined_general %>% 
+  pivot_longer(cols = c(pre_covid_index, during_covid_index), 
+               names_to = 'year', 
+               values_to = 'index_score') %>% 
+  mutate(year = factor(year, levels = c('pre_covid_index', 'during_covid_index'),
+                       labels = c('2017', '2021')))
+
+#view(long_gen_count) ### view resulting dataframe
+
+
+#--- determine for how many countries have increased and decreased its findex score
+long_gen_countss = long_gen_count |>
+  group_by(change) |>
+  summarise(n = n())
+
+long_gen_countss # no. of countries for whom dropped their scores, or became worse
+#--- since we are looking at both 2017 & 2021, you would need to divide the results into two
+#--- for ex. we get 32 for 'increased', hence 16 countries have increased its findex score
+#view(long_gen_countss) ### view resulting data frame
+
+#--- To look at the summary statistics
+summary(long_gen_count)
+
+
+#--- creating increased country labels for plot
+increasing_labels <- long_gen_count %>% 
+  filter(change == 'increasing') %>%
+  pivot_wider(names_from = 'year', values_from = 'index_score') %>%
+  mutate(nrow=1:n(),
+         year = if_else(nrow %% 2 == 0, '2017', '2021'),
+         index_score = if_else(nrow %% 2 == 0, `2017`, `2021`),
+         nudge_x = if_else(nrow %% 2 == 0, -0.2, 0.2)
+         ) %>% select(country, year, index_score, nudge_x)
+
+#view(increasing_labels) ### view resulting dataframe
+
+
+#--- run this in the console to keep the labels and to view the plot in 'Plots' panel of RStudio 
+long_general_count <- long_gen_count %>% ggplot(aes(x= year, y = index_score, group = country, color = change)) +
+  geom_line(show.legend = TRUE,
+            size = 0.1) +
+  geom_text_repel(data = increasing_labels,
+             aes(x= year, y =index_score, label = country),
+             inherit.aes = FALSE,
+             show.legend = FALSE,
+             nudge_x = increasing_labels$nudge_x,
+            direction = 'y' ) +
+  labs(x = 'Year -',
+       y = 'Mean Financial Inclusion Index Score -',
+       title = 'Country Financial Inclusion (2017 vs 2021)',
+       subtitle = 'General Population | Country by Region') +
+ scale_color_manual(name = NULL, 
+                     breaks = c('decreasing', 'stable', 'increasing'),
+                     values = c('#0000FF', '#FFFFFF', '#FF0000'),
+                     labels= c('decreasing', 'stable', 'increasing')) +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA))
+  
+#--- Display the normal graph
+long_general_count
+
+#--- display it interactively
+ggplotly(long_general_count)
+
+```
+
+#### Women Population: Comparing country FI scores
+
+```{r women_country_fi_diff}
+
+#--- Retrieving data from Women data processing section and placing it into two different data frames; countries that showed a decrease and increase in FI
+
+#--- data frame consisting of countries in the women pop. where FI has decreased
+women_countries_decreased <- low_index_filtered_women |>
+  filter(index_dropped == TRUE) |>
+  select(country)
+
+
+#--- data frame consisting of countries in the women pop. where FI has increased
+women_countries_increased <- low_index_filtered_women |>
+  filter(index_dropped == FALSE) |>
+  select(country)
+
+#view(women_countries_increased) ### view resulting dataframe
+
+
+#--- women decreased and increased FI country data frames combined with regions
+womens_dec <- merge(combined_regions, women_countries_decreased, by = 'country')
+womens_inc <- merge(combined_regions, women_countries_increased, by = 'country')
+
+
+#--- retrieving data about pre/during covid FI scores for increased and decreased countries
+women_index_dec <- merge(womens_dec, pre_during_covid_women, by = 'country')
+women_index_inc <- merge(womens_inc, pre_during_covid_women, by = 'country')
+
+
+#--- filtering out Iceland due to invalid values/NA's
+women_index_in <- women_index_inc %>% filter(country != 'Iceland')
+
+
+#--- combining two data frames from above
+combined_womens <- rbind(women_index_in, women_index_dec)
+#view(combined_womens) ### view resulting dataframe
+
+
+#--- creating new column that displays change in FI score
+combined_womens <- combined_womens %>% 
+  mutate(
+    change = case_when(pre_covid_index < during_covid_index ~ 'increasing', pre_covid_index > during_covid_index ~ 'decreasing',
+ TRUE ~ 'stable'))
+
+#view(combined_womens) ### view resulting dataframe
+
+
+#--- creating new variable that turns the combined data frame to a long tibble and mutates a new column to identify an increase/decrease
+long_women_count <- combined_womens %>% 
+  pivot_longer(cols = c(pre_covid_index, during_covid_index), 
+               names_to = 'year', 
+               values_to = 'index_score') %>% 
+  mutate(year = factor(year, levels = c('pre_covid_index', 'during_covid_index'),
+                       labels = c('2017', '2021')))
+
+#view(long_women_count) ### view resulting dataframe
+
+
+#--- determine for how many countries have increased and decreased its findex score
+long_women_countss = long_women_count |>
+  group_by(change) |>
+  summarise(n = n())
+
+long_women_countss # no. of countries for whom dropped their scores, or became worse
+#--- since we are looking at both 2017 & 2021, you would need to divide the results into two
+#--- for ex. we get 32 for 'increased', hence 16 countries have increased its findex score
+#view(long_women_counts) ### view resulting data frame
+
+
+#--- creating increased country labels for plot
+women_increasing_labels <- long_women_count %>% 
+  filter(change == 'increasing') %>%
+  pivot_wider(names_from = 'year', values_from = 'index_score') %>%
+  mutate(nrow=1:n(),
+         year = if_else(nrow %% 2 == 0, '2017', '2021'),
+         index_score = if_else(nrow %% 2 == 0, `2017`, `2021`),
+         nudge_x = if_else(nrow %% 2 == 0, -0.2, 0.2)
+         ) %>% select(country, year, index_score, nudge_x)
+
+#view(women_increasing_labels) long_women_count
+
+
+#--- have to run this in the console to keep the labels and to view the plot in 'Plots' panel of RStudio 
+long_womens_count <- long_women_count %>% ggplot(aes(x= year, y = index_score, group = country, color = change)) +
+  geom_line(show.legend = TRUE,
+            size = 0.1) +
+  geom_text_repel(data = women_increasing_labels,
+             aes(x= year, y =index_score, label = country),
+             inherit.aes = FALSE,
+             show.legend = FALSE,
+             nudge_x = women_increasing_labels$nudge_x,
+            direction = 'y' ) +
+  labs(x = 'Year -',
+       y = 'Mean Financial Inclusion Index Score -',
+       title = 'Country Financial Inclusion (2017 vs 2021)',
+       subtitle = 'Womens Population | Country by Region') +
+ scale_color_manual(name = NULL, 
+                     breaks = c('decreasing', 'stable', 'increasing'),
+                     values = c('#0000FF', '#FFFFFF', '#FF0000'),
+                     labels= c('decreasing', 'stable', 'increasing')) +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA))
+  
+#--- Display the normal graph
+long_womens_count
+
+#--- display it interactively
+ggplotly(long_womens_count)
+```
+
+#### Low-Income Adults: Comparing country FI scores
+
+```{r poorest_country_fi_diff}
+
+#--- Retrieving data from low-income adult data processing section and placing it into two different data frames; countries that showed a decrease and increase in FI
+#--- data frame consisting of countries in poor adult pop. where FI decreased
+poorest_countries_decreased <- low_index_filtered_poorest |>
+  filter(index_dropped == TRUE) |>
+  select(country)
+
+#--- data frame consisting of countries in poor adult pop. where FI increased
+poorest_countries_increased <- low_index_filtered_poorest |>
+  filter(index_dropped == FALSE) |>
+  select(country)
+
+
+#--- low income decrease and increase FI country data frames combined with regions
+poorest_decreased <- merge(combined_regions, poorest_countries_decreased, by = 'country')
+poorest_increased <- merge(combined_regions, poorest_countries_increased, by = 'country')
+
+
+#--- poorest decreased and increased FI country data frames combined with regions
+poorest_dec <- merge(combined_regions, poorest_countries_decreased, by = 'country')
+poorest_inc <- merge(combined_regions, poorest_countries_increased, by = 'country')
+
+
+#--- retrieving data about pre/during covid FI scores for increased and decreased countries
+poorest_index_dec <- merge(poorest_dec, pre_during_covid_poorest, by = 'country')
+poorest_index_in <- merge(poorest_inc, pre_during_covid_poorest, by = 'country')
+
+
+#--- filtering out iceland due to invalid values/NA's
+poorest_index_in <- poorest_index_in %>% filter(country != 'Iceland')
+#view(poorest_index_in) ### view resulting dataframe
+
+
+#--- combining two data frames from above
+combined_poorest <- rbind(poorest_index_in, poorest_index_dec)
+#view(combined_poorest) ### view resulting dataframe
+
+
+#--- creating new column that displays change in FI score
+combined_poorest <- combined_poorest %>% 
+  mutate(
+    change = case_when(pre_covid_index < during_covid_index ~ 'increasing', pre_covid_index > during_covid_index ~ 'decreasing',
+ TRUE ~ 'stable'))
+
+#view(combined_poorest) ### view resulting dataframe
+
+
+#--- creating new variable that turns the combined data frame to a long tibble and mutates a new column to identify an increase/decrease
+
+long_poorest_count <- combined_poorest %>% 
+  pivot_longer(cols = c(pre_covid_index, during_covid_index), 
+               names_to = 'year', 
+               values_to = 'index_score') %>% 
+  mutate(year = factor(year, levels = c('pre_covid_index', 'during_covid_index'),
+                       labels = c('2017', '2021')))
+
+#view(long_poorest_count) ### view resulting dataframe
+
+
+#--- determine for how many countries have increased and decreased its findex score
+long_poorest_countss = long_poorest_count |>
+  group_by(change) |>
+  summarise(n = n())
+
+long_poorest_countss # no. of countries for whom dropped their scores, or became worse
+#--- since we are looking at both 2017 & 2021, you would need to divide the results into two
+#--- for ex. we get 32 for 'increased', hence 16 countries have increased its findex score
+#view(long_poorest_countss) ### view resulting data frame
+
+
+#--- creating increased country labels for plot
+poorest_increasing_labels <- long_poorest_count %>% 
+  filter(change == 'increasing') %>%
+  pivot_wider(names_from = 'year', values_from = 'index_score') %>%
+  mutate(nrow=1:n(),
+         year = if_else(nrow %% 2 == 0, '2017', '2021'),
+         index_score = if_else(nrow %% 2 == 0, `2017`, `2021`),
+         nudge_x = if_else(nrow %% 2 == 0, 0.5, -0.5)
+         ) %>% select(country, year, index_score, nudge_x)
+
+#view(poorest_increasing_labels) ### view resulting dataframe
+
+
+#--- have to run this in the console to keep the labels and to view the plot in 'Plots' panel of RStudio 
+long_pooreests_count <- long_poorest_count %>% ggplot(aes(x= year, y = index_score, group = country, color = change)) +
+  geom_line(show.legend = TRUE,
+            size = 0.1) +
+  geom_text_repel(data = poorest_increasing_labels,
+             aes(x= year, y =index_score, label = country),
+             inherit.aes = FALSE,
+             hjust = 'outward',
+             show.legend = FALSE,
+             nudge_x = women_increasing_labels$nudge_x,
+            direction = 'y' ) +
+  labs(x = 'Year -',
+       y = 'Mean Financial Inclusion Index Score -',
+       title = 'Country Financial Inclusion (2017 vs 2021)',
+       subtitle = 'Low-Income Adults Population | Country by Year') +
+ scale_color_manual(name = NULL, 
+                     breaks = c('decreasing', 'stable', 'increasing'),
+                     values = c('#0000FF', '#FFFFFF', '#FF0000'),
+                     labels= c('decreasing', 'stable', 'increasing')) +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA))
+  
+
+#--- Display the normal graph
+long_pooreests_count
+
+#--- display it interactively
+ggplotly(long_pooreests_count)
+```
+
+### 3.1 Individual Increasing/Decreasing Slope Charts
+
+#### General Population Slope Charts
+
+```{r general_inc_dec_slopes}
+
+library(patchwork) ### for combining and arranging multiple ggplot2 plots 
+
+
+#--- calculating the overall y-axis limits
+y_axis_limits <- long_gen_count %>%
+  summarize(min_y = min(index_score), max_y = max(index_score))
+
+#--- creating a plot for increasing scores
+gen_slope_increasing <- long_gen_count %>%
+  filter(change == 'increasing') %>%
+  ggplot(aes(x = year, y = index_score, group = country)) +
+  geom_line(aes(color = change), size = 0.1) +
+  labs(x = 'Year -', y = 'Mean Financial Inclusion Index Score -',
+       title = 'Increasing Scores | General Population',
+       subtitle = '2017 | 2021') +
+  scale_color_manual(values = c('increasing' = '#FF0000'),
+                     name = 'Direction of FI Score -') +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA)) +
+  ylim(y_axis_limits$min_y, y_axis_limits$max_y) +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  
+  
+
+#--- Create a plot for decreasing scores
+gen_slope_decreasing <- long_gen_count %>%
+  filter(change == 'decreasing') %>%
+  ggplot(aes(x = year, y = index_score, group = country)) +
+  geom_line(aes(color = change), size = 0.1) +
+  labs(x = 'Year -', y = 'Mean Financial Inclusion Index Score -',
+       title = 'Decreasing Scores | General Population',
+       subtitle = '2017 | 2021') +
+  scale_color_manual(values = c('decreasing' = '#0000FF'),
+                     name = 'Direction of FI Score -') +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA)) +
+  ylim(y_axis_limits$min_y, y_axis_limits$max_y)+
+theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+#--- Combine the two plots side by side
+final_plot <- gen_slope_increasing / gen_slope_decreasing
+
+#--- Display the combined plot
+final_plot
+
+```
+
+#### Women Population Slope Charts
+
+```{r women_inc_dec_slopes}
+
+#--- calculating the overall y-axis limits
+y_axis_limits <- long_women_count %>%
+  summarize(min_y = min(index_score), max_y = max(index_score))
+
+
+#--- creating a plot for increasing scores
+women_slope_increasing <- long_women_count %>%
+  filter(change == 'increasing') %>%
+  ggplot(aes(x = year, y = index_score, group = country)) +
+  geom_line(aes(color = change), size = 0.1) +
+  labs(x = 'Year -', y = 'Mean Financial Inclusion Index Score -',
+       title = 'Increasing Scores | Women Population',
+       subtitle = '2017 | 2021') +
+  scale_color_manual(values = c('increasing' = '#FF0000'),
+                     name = 'Direction of FI Score -') +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA)) +
+  ylim(y_axis_limits$min_y, y_axis_limits$max_y) +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+#--- creating a plot for decreasing scores
+women_slope_decreasing <- long_women_count %>%
+  filter(change == 'decreasing') %>%
+  ggplot(aes(x = year, y = index_score, group = country)) +
+  geom_line(aes(color = change), size = 0.1) +
+  labs(x = 'Year -', y = 'Mean Financial Inclusion Index Score -',
+       title = 'Decreasing Scores | Women Population',
+       subtitle = '2017 | 2021') +
+  scale_color_manual(values = c('decreasing' = '#0000FF'),
+                     name = 'Direction of FI Score -') +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA)) +
+  ylim(y_axis_limits$min_y, y_axis_limits$max_y) +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+#--- combining the two plots side by side
+women_final_plot <- women_slope_increasing / women_slope_decreasing
+
+
+#--- display the combined plot
+women_final_plot
+
+```
+
+#### Low-Income Adult Population Slope Charts
+
+```{r poor_inc_dec_slopes}
+
+#--- calculating the overall y-axis limits
+y_axis_limits <- long_poorest_count %>%
+  summarize(min_y = min(index_score), max_y = max(index_score))
+
+
+#--- creating a plot for increasing scores
+poor_slope_increasing <- long_poorest_count %>%
+  filter(change == 'increasing') %>%
+  ggplot(aes(x = year, y = index_score, group = country)) +
+  geom_line(aes(color = change), size = 0.1) +
+  labs(x = 'Year -', y = 'Mean Financial Inclusion Index Score -',
+       title = 'Increasing Scores | Low-Income Adult Population',
+       subtitle = '2017 | 2021') +
+  scale_color_manual(values = c('increasing' = '#FF0000'),
+                     name = 'Direction of FI Score -') +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA)) +
+  ylim(y_axis_limits$min_y, y_axis_limits$max_y) +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+#--- creating a plot for decreasing scores
+poor_slope_decreasing <- long_poorest_count %>%
+  filter(change == 'decreasing') %>%
+  ggplot(aes(x = year, y = index_score, group = country)) +
+  geom_line(aes(color = change), size = 0.1) +
+  labs(x = 'Year -', y = 'Mean Financial Inclusion Index Score -',
+       title = 'Decreasing Scores | Low-Income Adult Population',
+       subtitle = '2017 | 2021') +
+  scale_color_manual(values = c('decreasing' = '#0000FF'),
+                     name = 'Direction of FI Score -') +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = NA)) +
+  ylim(y_axis_limits$min_y, y_axis_limits$max_y) +
+  theme_bw() +
+  ### modifies the appearance of the region x-axis text labels 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+#--- combining the two plots side by side
+lowincome_final_plot <- poor_slope_increasing / poor_slope_decreasing
+
+#--- display the combined plot
+lowincome_final_plot
+
+```
+
+### 4. Financial Inclusion Index Score per Countries
+
+In the following code blocks, each focusing on a specific target population, we processed our data by creating a new data frame containing information about countries, population density, income group categories, the FI index of countries in 2021, and the regions to which each country belongs. Beforehand, we extracted a few variables from the original dataset from the World Bank called 'DatabankWide' and merged this data with the dataset we created in the earlier data processing steps using the 'inner_join' function. We then cleaned the data frame by removing any unwanted variables and columns. Subsequently, we merged it once again with another data frame created in a previous step.
+
+Our primary focus was to examine the effects of population density (x-axis) on the FI Index score in 2021 (y-axis), visualizing it using Bubble charts from Plotly. Plotly is a tool that enables effective data visualization by allowing us to color-code the countries by regions and each country's income level. Additionally, it provides interactivity, offering more information about specific data points. We also did the same but using a regression line to see the correlation between the increase in population and its effect on the financial inclusion index of each countries by region and income level. Finally, these data processing steps were repeated for all target population groups.
+
+#### General Population: Comparing FI Score by population density and income group of each country.
+
+```{r general_findex_per_country}
+
+###---------------------------- Creating a new dataframe for General population
+#--- Grabbing the Population Density and Income Group infromation from the 
+#--- original dataframe called DatabankWide
+#--- Combining it with the Financial inclusion information from 2017 (pre) and 
+#--- 2021 (during) for all countries using 'inner_join' function 
+
+#view(DatabankWide) ### view resulting data frame
+
+population_income_country <- DatabankWide %>%
+  filter(Year == '2021') %>%
+  select('Country name', 'Adult populaiton', 'Income group') %>%
+  rename('country' = 'Country name') %>%
+  rename('population' = 'Adult populaiton')  %>%
+  rename('income_group' = 'Income group')
+
+#view(population_income_country) ### view resulting data frame
+
+
+#--- Joining general population data frame that consists country, year (2021), and mean FI index with the population. 
+general_income_pop_fi <- inner_join(population_income_country, pre_during_covid, by = 'country') 
+
+#view(general_income_pop_fi) ### view resulting data frame
+
+#--- removing the 2017 financial inclusion index 
+general_income_pop_fi_during <- na.omit(general_income_pop_fi) |> ### removes NAs + column
+  select(-pre_covid_index)
+
+#view(general_income_pop_fi_during) ### view resulting data frame
+
+
+#--- Joining the Countries per Region dataframe made above, having Country, Population Density, 2021 Financial Inclusion Index, Region
+general_income_pop_region_fi <- inner_join(general_income_pop_fi_during, combined_regions, by = 'country')
+
+#view(general_income_pop_region_fi) ### view resulting data frame
+
+
+###------- Making Bubble chart to show the density of the population and its FI score.
+#--- Choosing colours for the regions
+colors <- c('#4AC6B7', '#1972A4', '#965F8A', '#FF7070', '#C61951', '#FFA500', '#008080')
+
+#--- Bubble chart that contains all countries with their population
+general_pop_bubble_chart <- plot_ly(data = general_income_pop_region_fi, x = ~population, 
+                            y = ~during_covid_index, color = ~region, size = ~population, 
+                            type = 'scatter', mode = 'markers',
+                            ### defining chart type and marker style
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index,
+                                          "<br>Income Group:", income_group))
+
+#--- Labeling the plot
+general_pop_bubble_chart <- general_pop_bubble_chart %>% 
+  layout(title = 'Findex vs. General Population by Country Region, 2021',
+         xaxis = list(title = 'Population Density'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+general_pop_bubble_chart <- general_pop_bubble_chart %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+general_pop_bubble_chart
+
+
+###--- Making another subset of the dataframe made above to only show a threshold 
+###--- of a country that have a population of less than 50 million. 
+generalpop_region_fi_subs <- subset(general_income_pop_region_fi, population < 50000000)
+
+#view(generalpop_region_fi_subs) # view resulting data frame
+
+#--- Creating bubble chart that only contains a country population of less than 50 million
+general_pop_subs_bubble <- plot_ly(data = generalpop_region_fi_subs, x = ~population, 
+                            y = ~during_covid_index, color = ~region, size = ~population, 
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index,
+                                          "<br>Income Group:", income_group))
+
+#--- Labeling the plot
+general_pop_subs_bubble <- general_pop_subs_bubble %>% 
+  layout(title = 'Findex vs. General Population by Country Region, 2021',
+         xaxis = list(title = 'Population Density (< 50 million)'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+general_pop_subs_bubble <- general_pop_subs_bubble %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+general_pop_subs_bubble
+
+
+#---------------- creating scatter plot with regression lines (without data points) 
+#--- containing General with all Population and Country by Region
+general_pop_regresion_plot <- ggplot(data = general_income_pop_region_fi, 
+  aes(x = population, y = during_covid_index, color = region)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, linetype = "line", size = 1) +
+  labs(title = 'Findex vs. General Population by Country by Region, 2021',
+    x = 'Population Density',
+    y = 'Financial Inclusion Index (Findex)'
+  ) +
+  scale_color_manual(values = colors) +
+  theme_minimal()
+
+#--- convert the ggplot to a plotly object
+general_pop_lines <- ggplotly(general_pop_regresion_plot)
+
+#--- show the interactive plot
+general_pop_lines
+
+
+
+
+
+###----------------------------------------------------------------------------------------- 
+#------------ Create the bubble chart by General Income with all Population and Country
+general_income_bubble_chart <- plot_ly(data = general_income_pop_region_fi, x = ~population, 
+                            y = ~during_covid_index, color = ~income_group, size = ~population,
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index))
+
+#--- Labeling the plot
+general_income_bubble_chart <- general_income_bubble_chart %>% 
+  layout(title = 'Findex vs. General Population by Country Income Level, 2021',
+         xaxis = list(title = 'Population Density'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+general_income_bubble_chart <- general_income_bubble_chart %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+general_income_bubble_chart
+
+
+#--- Creating another bubble chart containing country population of less than 50 million
+#--- by General Income Population.
+general_income_bubble_subs <- plot_ly(data = generalpop_region_fi_subs, x = ~population, 
+                            y = ~during_covid_index, color = ~income_group, size = ~population,
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index))
+
+#--- Labeling the plot
+general_income_bubble_subs <- general_income_bubble_subs %>% 
+  layout(title = 'Findex vs. General Population by Country Income Level, 2021',
+         xaxis = list(title = 'Population Density (< 50 million)'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale
+general_income_bubble_subs <- general_income_bubble_subs %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+general_income_bubble_subs
+
+
+
+#-------------------- creating scatter plot with regression lines (without data points) 
+#--- containing General Income with all Population and Country
+general_regresion_plot <- ggplot(data = general_income_pop_region_fi, 
+  aes(x = population, y = during_covid_index, color = income_group)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, linetype = "line", 
+              size = 1) +
+  labs(title = 'Findex vs. General Population by Country Income Level, 2021',
+    x = 'Population Density',
+    y = 'Financial Inclusion Index (Findex)'
+  ) +
+  scale_color_manual(values = colors) + 
+  theme_minimal()
+
+#--- convert the ggplot to a plotly object
+general_income_lines <- ggplotly(general_regresion_plot)
+
+#--- show the interactive plot
+general_income_lines
+
+```
+
+#### Women Population: Comparing FI Score by population density and income group of each country.
+
+```{r women_findex_per_country}
+
+###--- Repeating the same data processing and data visualization 
+###--- from above for the Women population
+
+#--- Joining general population data frame that consists country, year (2021), and mean FI index with the population. 
+women_income_pop_fi <- inner_join(population_income_country, pre_during_covid_women, by = 'country') 
+
+#view(women_income_pop_fi) ### view resulting data frame
+
+#--- removing the 2017 financial inclusion index 
+women_income_pop_fi_during <- na.omit(women_income_pop_fi) |> ### removes NAs + column
+  select(-pre_covid_index)
+
+#view(women_income_pop_fi_during) ### view resulting data frame
+
+
+#--- Joining the Countries per Region dataframe made above, having Country, Population Density, 2021 Financial Inclusion Index, Region
+women_income_pop_region_fi <- inner_join(women_income_pop_fi_during, combined_regions, by = 'country')
+
+#view(women_income_pop_region_fi) ### view resulting data frame
+
+
+
+###------- Making Bubble chart to show the density of the population and its FI score.
+#--- Choosing colours for the regions
+colors <- c('#4AC6B7', '#1972A4', '#965F8A', '#FF7070', '#C61951', '#FFA500', '#008080')
+
+#--- Bubble chart that contains all countries with their population
+women_pop_bubble_chart <- plot_ly(data = women_income_pop_region_fi, x = ~population, 
+                            y = ~during_covid_index, color = ~region, size = ~population, 
+                            type = 'scatter', mode = 'markers',
+                            ### defining chart type and marker style
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index,
+                                          "<br>Income Group:", income_group))
+
+#--- Labeling the plot
+women_pop_bubble_chart <- women_pop_bubble_chart %>% 
+  layout(title = 'Findex vs. Women Population by Country Region, 2021',
+         xaxis = list(title = 'Population Density'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+women_pop_bubble_chart <- women_pop_bubble_chart %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+women_pop_bubble_chart
+
+
+###--- Making another subset of the dataframe made above to only show a threshold 
+###--- of a country that have a population of less than 50 million. 
+#--- Creating a subset of population 
+womenpop_region_fi_subs <- subset(women_income_pop_region_fi, population < 50000000)
+
+#view(womenpop_region_fi_subs) ### view resulting data frame
+
+#--- Creating bubble chart that only contains a country population of less than 50 million
+women_pop_subs_bubble <- plot_ly(data = womenpop_region_fi_subs, x = ~population, 
+                            y = ~during_covid_index, color = ~region, size = ~population, 
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index,
+                                          "<br>Income Group:", income_group))
+
+#--- Labeling the plot
+women_pop_subs_bubble <- women_pop_subs_bubble %>% 
+  layout(title = 'Findex vs. Women Population by Country Region, 2021',
+         xaxis = list(title = 'Population Density (< 50 milion)'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+women_pop_subs_bubble <- women_pop_subs_bubble %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+women_pop_subs_bubble
+
+
+#-------------------- creating scatter plot with regression lines (without data points) 
+#--- containing Women with all Population and Country by Region
+women_pop_regresion_plot <- ggplot(data = women_income_pop_region_fi, 
+  aes(x = population, y = during_covid_index, color = region)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, linetype = "line", size = 1) +
+  labs(title = 'Findex vs. Women Population by Country by Region, 2021',
+    x = 'Population Density',
+    y = 'Financial Inclusion Index (Findex)'
+  ) +
+  scale_color_manual(values = colors) +
+  theme_minimal()
+
+#--- convert the ggplot to a plotly object
+women_pop_lines <- ggplotly(women_pop_regresion_plot)
+
+#--- show the interactive plot
+women_pop_lines
+
+
+
+#---------------------------------------------------------------------------------------------
+###--------------- Create the bubble chart by Women Income with all Population
+women_income_bubble_chart <- plot_ly(data = women_income_pop_region_fi, x = ~population, 
+                            y = ~during_covid_index, color = ~income_group, size = ~population,
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index))
+
+#--- Labeling the plot
+women_income_bubble_chart <- women_income_bubble_chart %>% 
+  layout(title = 'Findex vs. Women Population by Country Income Level, 2021',
+         xaxis = list(title = 'Population Density'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+women_income_bubble_chart <- women_income_bubble_chart %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+women_income_bubble_chart
+
+
+#--- Creating another bubble chart containing country population of less than 50 million
+#--- by Women Income Population.
+women_income_bubble_subs <- plot_ly(data = womenpop_region_fi_subs, x = ~population, 
+                            y = ~during_covid_index, color = ~income_group, size = ~population,
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index))
+
+#--- Labeling the plot
+women_income_bubble_subs <- women_income_bubble_subs %>% 
+  layout(title = 'Findex vs. Women Population by Country Income Level, 2021',
+         xaxis = list(title = 'Population Density (< 50 million)'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale
+women_income_bubble_subs <- women_income_bubble_subs %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+women_income_bubble_subs
+
+
+#-------------------- creating scatter plot with regression lines (without data points) 
+#--- containing Women Income with all Population and Country
+women_regresion_plot <- ggplot(data = women_income_pop_region_fi, 
+  aes(x = population, y = during_covid_index, color = income_group)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, linetype = "line", 
+              size = 1) +
+  labs(title = 'Findex vs. Women Population by Country Income Level, 2021',
+    x = 'Population Density',
+    y = 'Financial Inclusion Index (Findex)'
+  ) +
+  scale_color_manual(values = colors) + 
+  theme_minimal()
+
+#--- convert the ggplot to a plotly object
+women_income_lines <- ggplotly(women_regresion_plot)
+
+#--- show the interactive plot
+women_income_lines
+
+```
+
+#### Poorest Population: Comparing FI Score by population density and income group of each countries.
+
+```{r women_findex_per_country}
+
+###--- Repeating the same data processing and data visualization 
+###--- from above for the Poorest population
+
+#--- Joining general population data frame that consists country, year (2021), and mean FI index with the population. 
+poorest_income_pop_fi <- inner_join(population_income_country, pre_during_covid_poorest, by = 'country') 
+
+#view(poorest_income_pop_fi) ### view resulting data frame
+
+#--- removing the 2017 financial inclusion index 
+poorest_income_pop_fi_during <- na.omit(poorest_income_pop_fi) |> ### removes NAs + column
+  select(-pre_covid_index)
+
+#view(poorest_income_pop_fi_during) ### view resulting data frame
+
+
+#--- Joining the Countries per Region dataframe made above, having Country, Population Density, 2021 Financial Inclusion Index, Region
+poorest_income_pop_region_fi <- inner_join(poorest_income_pop_fi_during, combined_regions, by = 'country')
+
+#view(poorest_income_pop_region_fi) ### view resulting data frame
+
+
+
+###------- Making Bubble chart to show the density of the population and its FI score.
+#--- Choosing colours for the regions
+colors <- c('#4AC6B7', '#1972A4', '#965F8A', '#FF7070', '#C61951', '#FFA500', '#008080')
+
+#--- Bubble chart that contains all countries with their population
+poorest_pop_bubble_chart <- plot_ly(data = poorest_income_pop_region_fi, x = ~population, 
+                            y = ~during_covid_index, color = ~region, size = ~population, 
+                            type = 'scatter', mode = 'markers',
+                            ### defining chart type and marker style
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index,
+                                          "<br>Income Group:", income_group))
+
+#--- Labeling the plot
+poorest_pop_bubble_chart <- poorest_pop_bubble_chart %>% 
+  layout(title = 'Findex vs. Poorest Population by Country Region, 2021',
+         xaxis = list(title = 'Population Density'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+poorest_pop_bubble_chart <- poorest_pop_bubble_chart %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+poorest_pop_bubble_chart
+
+
+###--- Making another subset of the dataframe made above to only show a threshold 
+###--- of a country that have a population of less than 50 million. 
+#--- Creating a subset of population 
+poorestpop_region_fi_subs <- subset(poorest_income_pop_region_fi, population < 50000000)
+
+#view(poorestpop_region_fi_subs) ### view resulting data frame
+
+#--- Creating bubble chart that only contains a country population of less than 50 million
+poorest_pop_subs_bubble <- plot_ly(data = poorestpop_region_fi_subs, x = ~population, 
+                            y = ~during_covid_index, color = ~region, size = ~population, 
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index,
+                                          "<br>Income Group:", income_group))
+
+#--- Labeling the plot
+poorest_pop_subs_bubble <- poorest_pop_subs_bubble %>% 
+  layout(title = 'Findex vs. Poorest Population by Country Region, 2021',
+         xaxis = list(title = 'Population Density (< 50 million)'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+poorest_pop_subs_bubble <- poorest_pop_subs_bubble %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+poorest_pop_subs_bubble
+
+
+#----------------- creating scatter plot with regression lines (without data points) 
+#--- containing Poorest with all Population and Country by Region
+poorest_pop_regresion_plot <- ggplot(data = poorest_income_pop_region_fi, 
+  aes(x = population, y = during_covid_index, color = region)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, linetype = "line", size = 1) +
+  labs(title = 'Findex vs. Poorest Population by Country by Region, 2021',
+    x = 'Population Density',
+    y = 'Financial Inclusion Index (Findex)'
+  ) +
+  scale_color_manual(values = colors) +
+  theme_minimal()
+
+#--- convert the ggplot to a plotly object
+poorest_pop_lines <- ggplotly(poorest_pop_regresion_plot)
+
+#--- show the interactive plot
+poorest_pop_lines
+
+
+
+
+#---------------------------------------------------------------------------------------------
+###--------------- Create the bubble chart by Poorest Income with all Population
+poorest_income_bubble_chart <- plot_ly(data = poorest_income_pop_region_fi, x = ~population, 
+                            y = ~during_covid_index, color = ~income_group, size = ~population,
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index))
+
+#--- Labeling the plot
+poorest_income_bubble_chart <- poorest_income_bubble_chart %>% 
+  layout(title = 'Findex vs. Poorest Population by Country Income Level, 2021',
+         xaxis = list(title = 'Population Density'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+poorest_income_bubble_chart <- poorest_income_bubble_chart %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+poorest_income_bubble_chart
+
+
+#--- Creating another bubble chart containing country population of less than 50 million
+#--- by Poorest Income Population.
+poorest_income_bubble_subs <- plot_ly(data = poorestpop_region_fi_subs, x = ~population, 
+                            y = ~during_covid_index, color = ~income_group, size = ~population,
+                            ### defining chart type and marker style
+                            type = 'scatter', mode = 'markers',
+                            marker = list(symbol = "circle", sizemode = "diameter",
+                                          line = list(width = 2, color = "#FFFFFF")), 
+                            ### specifies texts to appear when hovered over
+                            text = ~paste("Country:", country, "<br>Population:", population,
+                                          "<br>Findex 2021:", during_covid_index))
+
+#--- Labeling the plot
+poorest_income_bubble_subs <- poorest_income_bubble_subs %>% 
+  layout(title = 'Findex vs. Poorest Population by Country Income Level, 2021',
+         xaxis = list(title = 'Population Density (< 50 million)'),
+         yaxis = list(title = 'Financial Inclusion Index (Findex)'))
+
+#--- Customize the color scale if needed
+poorest_income_bubble_subs <- poorest_income_bubble_subs %>%
+  layout(colorway = colors)
+
+#--- Show the bubble chart
+poorest_income_bubble_subs
+
+
+
+#------------------ creating scatter plot with regression lines (without data points) 
+#--- containing Poorest Income with all Population and Country
+poorest_regresion_plot <- ggplot(data = poorest_income_pop_region_fi, 
+  aes(x = population, y = during_covid_index, color = income_group)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, linetype = "line", 
+              size = 1) +
+  labs(title = 'Findex vs. Poorest Population by Country Income Level, 2021',
+    x = 'Population Density',
+    y = 'Financial Inclusion Index (Findex)'
+  ) +
+  scale_color_manual(values = colors) + 
+  theme_minimal()
+
+#--- convert the ggplot to a plotly object
+poorest_income_lines <- ggplotly(poorest_regresion_plot)
+
+#--- show the interactive plot
+poorest_income_lines
+
+```
+
+### 5. Union of Countries that have increased for all focus groups:
+
+```{r increased_countries_union}
+
+#--- using union() to find which countries that have an FI increase, appear in all three of our focus groups; general, women, and low-income adults
+union_general <- general_index_in %>% 
+  filter(country != 'Iceland') %>% 
+  select(-region, -pre_covid_index, -during_covid_index)
+
+#view(union_general) ### view resulting dataframe
+
+
+union_womens <- women_index_in %>% 
+  filter(country != 'Iceland') %>% 
+  select(-region, -pre_covid_index, -during_covid_index)
+
+#view(union_womens) ### view resulting dataframe
+
+
+union_poorest <- poorest_index_in %>% 
+  filter(country != 'Iceland') %>% 
+  select(-region, -pre_covid_index, -during_covid_index)
+
+#view(union_poorest) ### view resulting dataframe
+
+
+#--- finding common countries between women and general pop.
+common_countries_women_general <- intersect(union_general$country, union_womens$country)
+
+
+#--- finding common countries between poorest and general pop.
+common_countries_poorest_general <- intersect(union_general$country, union_poorest$country)
+
+
+#--- finding common countries between poorest and women pop.
+common_countries_poorest_women <- intersect(union_poorest$country, union_womens$country)
+
+
+#--- finding the intersection of all increased countries
+common_countries_all <- intersect(common_countries_women_general, 
+  intersect(common_countries_poorest_general, common_countries_poorest_women))
+
+common_countries_df <- data.frame(country = common_countries_all)
+
+#view(common_countries_df) ### view resulting dataframe
+```
+
+#### EDA on Common Countries that have increased in FI over 2017 - 2021
+
+Here we are doing basic exploratory data analysis only on the countries that appeared to have an increase in their financial inclusion index score and appeared in all three focus groups. From this we gain insight into which countries had an overall better average score of FI in comparison to other countries.
+
+```{r eda_common_countries}
+
+#------------------------------------------- Bar Chart
+#--- containing number of countries in each region, combining common_countries_df with combined_region to create bar chart
+common_countries_region <- inner_join(common_countries_df, combined_regions, by = 'country')
+
+increased_bar <- ggplot(common_countries_region, aes(x = region, color = country)) +
+  geom_bar() +
+  labs(x = "Region -", 
+       y = "Number of Common Countries -", 
+       title = "Increased Union Countries -",
+       subtitle = 'Countries that saw an increase in FI score across general, women, and low-income adult populations', 
+       caption = 'Source: Global Findex Database, The World Bank 2023')
+
+#--- display the normal graph
+increased_bar
+
+#--- display it interactively
+ggplotly(increased_bar)
+
+
+#-------------------- retrieving financial scores in order to create scatter plot
+general_scores <- na.omit(pre_during_covid)
+women_scores <- na.omit(pre_during_covid_women)
+poorest_scores <- na.omit(pre_during_covid_poorest)
+
+#--- combining all scores together find on average which country had the best financial inclusion state for all three groups
+combined_scores <- bind_rows(general_scores, women_scores, poorest_scores)
+
+avg_score_per_country <- combined_scores %>% 
+  select(-pre_covid_index) %>% ### remove a column
+  group_by(country) %>%
+  summarise(avg_score = mean(during_covid_index, na.rm = TRUE))
+
+#--- combining this data frame with common_countries_region data frame
+avg_fi_inc_countries <- inner_join(common_countries_region, avg_score_per_country, by = 'country') 
+
+#view(avg_fi_inc_countries) ### view resulting dataframe
+
+
+#----------------------- Scatter Plot: FI increase vs region
+avg_score_plot <- ggplot(avg_fi_inc_countries, 
+  aes(x = region, y = avg_score, color = country)) +
+  geom_point(size = 4) +
+  labs(x = "Region -", y = "Average Financial Inclusion Index Score -", 
+       title = "Increased Average FI Countries by Region",
+       subtitle = 'Focus Groups | General, Women, Low-Income Adults',
+       caption = 'Source: Global Findex Database, The World Bank 2023')
+
+#--- Display the normal graph
+avg_score_plot
+
+#--- display it interactively
+interactive_plot <- ggplotly(avg_score_plot)
+interactive_plot
+```
+
+### 5.1 Union countries that have decreased for all focus groups:
+
+This section is doing exploratory data analysis on the countries that appear in all focus groups which have had a decrease in their financial inclusion index score. From this data we are able to make inferences on which countries had, on average, the worst scores.
+
+```{r decreased_countries_union}
+
+#--- using union() to find which countries that have an FI decrease, appear in all three of our focus groups; general, women, and low-income adults
+union_general_dec <- general_index_dec %>% 
+  select(-region, -pre_covid_index, -during_covid_index)
+
+union_womens_dec <- women_index_dec %>% 
+  select(-region, -pre_covid_index, -during_covid_index)
+
+union_poorest_dec <- poorest_index_dec %>% 
+  select(-region, -pre_covid_index, -during_covid_index)
+
+
+#--- finding common countries between women and general pop.
+common_countries_women_general_dec <- intersect(union_general_dec$country, union_womens_dec$country)
+
+
+#--- finding common countries between poorest and general pop.
+common_countries_poorest_general_dec <- intersect(union_general_dec$country, union_poorest_dec$country)
+
+
+#--- finding common countries between poorest and women pop.
+common_countries_poorest_women_dec <- intersect(union_poorest_dec$country, union_womens_dec$country)
+
+
+#--- finding the intersection of all decreased countries
+common_countries_all_dec <- intersect(common_countries_women_general_dec, intersect(common_countries_poorest_general_dec, common_countries_poorest_women_dec))
+
+dec_common_countries_df <- data.frame(country = common_countries_all_dec)
+
+#view(common_countries_all_dec) ### view resulting dataframe
+
+
+```
+
+#### EDA on Common Countries that have decreased in FI over 2017 - 2021
+
+Here we are doing basic exploratory data analysis only on the countries that appeared to have an decrease in their financial inclusion index score and appeared in all three focus groups. From this we gain insight into which countries had an overall poor average score of FI in comparison to other countries.
+
+```{r eda_common_decrease_countries}
+
+#--------------------------------------------- Bar Chart:
+#--- number of countries in each region, combining common_countries_df with combined_region to create bar chart 
+#-------------------------------------- WARNING: MESSY GRAPH
+common_countries_region_dec <- inner_join(dec_common_countries_df, combined_regions, by = 'country')
+
+decreased_bar <- ggplot(common_countries_region_dec, aes(x = region, color = country)) +
+  geom_bar() +
+  labs(x = "Region -", 
+       y = "Number of Common Countries -", 
+       title = "Decreased Union Countries -",
+       subtitle = 'Countries that saw a decrease in FI score across general, women, and low-income adult populations', 
+       caption = 'Source: Global Findex Database, The World Bank 2023')
+
+#--- display the normal graph
+decreased_bar
+
+#--- display it interactively
+ggplotly(decreased_bar)
+
+
+
+#------------------- retrieving financial scores in order to create scatter plot
+general_scores <- na.omit(pre_during_covid)
+women_scores <- na.omit(pre_during_covid_women)
+poorest_scores <- na.omit(pre_during_covid_poorest)
+
+
+#--- combining all scores together find on average which country had the best financial inclusion state for all three groups
+combined_scores_dec <- bind_rows(general_scores, women_scores, poorest_scores)
+
+avg_score_per_country_dec <- combined_scores_dec %>% 
+  select(-pre_covid_index) %>% group_by(country) %>%
+  summarise(avg_score = mean(during_covid_index, na.rm = TRUE))
+
+
+#--- combining this data frame with common_countries_region data frame
+avg_fi_inc_countries_dec <- 
+  inner_join(common_countries_region_dec, avg_score_per_country_dec, by = 'country') 
+
+#view(avg_fi_inc_countries_dec) ### view resulting dataframe
+
+
+#----------------------------- Scatter Plot: FI increase vs region graph
+
+avg_score_plot_dec <- ggplot(avg_fi_inc_countries_dec, aes(x = region, y = avg_score, color = country)) +
+  geom_point(size = 4) +
+  labs(x = "Region -", y = "Average Financial Inclusion Index Score -", 
+       title = "Decreased Average FI Countries by Region",
+       subtitle = 'Focus Groups | General, Women, Low-Income Adults',
+       caption = 'Source: Global Findex Database, The World Bank 2023')
+
+#--- Display the normal graph
+avg_score_plot_dec
+
+#--- display it interactively
+avg_score_plot_dec <- ggplotly(avg_score_plot_dec)
+avg_score_plot_dec
+
+```
